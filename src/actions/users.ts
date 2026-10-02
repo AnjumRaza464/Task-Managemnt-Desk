@@ -136,7 +136,10 @@ export async function deleteUser(id: string) {
       await tx.comment.updateMany({ where: { authorId: id }, data: { authorId: manager.id } });
       await tx.attachment.updateMany({ where: { uploadedById: id }, data: { uploadedById: manager.id } });
       await tx.activityLog.updateMany({ where: { actorId: id }, data: { actorId: manager.id } });
-      // Assigned tasks + plans cascade via MonthlyPlan -> Task.
+      // Task.assigneeId is a restricting FK, so remove the user's tasks and plans explicitly.
+      // Deleting tasks cascades their subtasks, comments, attachments, activity and notifications.
+      await tx.task.deleteMany({ where: { assigneeId: id } });
+      await tx.monthlyPlan.deleteMany({ where: { userId: id } });
       await tx.user.delete({ where: { id } });
       await logActivity(
         {

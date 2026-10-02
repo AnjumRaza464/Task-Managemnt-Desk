@@ -1,6 +1,6 @@
 # AI Research Lab · Task Management
 
-Monthly task planning and tracking for small teams. Managers create users, plan each person's month, assign tasks and follow progress through a dashboard, kanban board, calendar and reports. Team members can sign in to a read-only view of their own tasks.
+Monthly task planning and tracking for small teams. Managers create users, plan each person's month, assign tasks and follow progress through a dashboard, kanban board, calendar and reports. Team members can sign in to see their own tasks and update their status and progress.
 
 ## Stack
 
@@ -16,7 +16,7 @@ Monthly task planning and tracking for small teams. Managers create users, plan 
 ## Features
 
 - **Dashboard**: stat cards, monthly progress, status and priority charts, team workload, due-soon list, recent activity.
-- **Users**: CRUD, activate/deactivate, per-user task stats. Roles: `ADMIN`, `MANAGER` (full access) and `MEMBER` (assignee; may sign in to a read-only view).
+- **Users**: CRUD, activate/deactivate, per-user task stats. Roles: `ADMIN`, `MANAGER` (full access) and `MEMBER` (assignee; may sign in to view their own tasks and update status and completion; everything else is read-only).
 - **Monthly plans**: one plan per user per month. Tasks land in the assignee's plan based on their due date; reassigning moves them.
 - **Tasks**: searchable, filterable, sortable table; kanban with drag and drop; calendar by due date; task detail with subtasks, comments, attachments (stored in Postgres, 5 MB max) and an activity timeline.
 - **Automatic status rules**: 100 % completion marks a task completed; past-due open tasks become overdue on page load; notifications are raised for assignments, completions, overdue and due-today tasks and comments.
@@ -97,7 +97,7 @@ src/
     (app)/           manager area: dashboard, users, monthly-plans, tasks,
                      tasks/kanban, tasks/[id], calendar, reports,
                      notifications, settings
-    (member)/        read-only member area: my-tasks
+    (member)/        member area: my-tasks (view, update status and progress)
     api/             auth, attachment download, report export
   actions/           server actions (one file per module, Zod validated)
   lib/

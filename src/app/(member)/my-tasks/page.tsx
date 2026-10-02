@@ -49,7 +49,7 @@ export default async function MyTasksPage({ searchParams }: PageProps<"/my-tasks
 
   return (
     <>
-      <PageHeader title={`Hello, ${user.name}`} description="Your monthly plans and assigned tasks. This view is read-only." />
+      <PageHeader title={`Hello, ${user.name}`} description="Your monthly plans and assigned tasks. Open a task to update its status and progress." />
 
       {plans.length === 0 ? (
         <EmptyState icon={ListTodo} title="No plans yet" description="Your manager has not assigned any monthly tasks to you." />

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { PageHeader } from "@/components/shared/page-header";
+import { MyTaskControls } from "@/components/member/my-task-controls";
 import { MONTH_NAMES } from "@/lib/constants";
 import { cn, formatBytes, formatDate, formatDateTime } from "@/lib/utils";
 
@@ -24,7 +25,10 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
 
   return (
     <>
-      <PageHeader title={task.title} description={`${MONTH_NAMES[task.plan.month - 1]} ${task.plan.year} plan`}>
+      <PageHeader
+        title={task.title}
+        description={`${MONTH_NAMES[task.plan.month - 1]} ${task.plan.year} plan · you can update the status and progress below`}
+      >
         <Button variant="outline" nativeButton={false} render={<Link href="/my-tasks" />}>
           <ArrowLeft /> Back to my tasks
         </Button>
@@ -112,18 +116,15 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
               <Row label="Due date">{formatDate(task.dueDate)}</Row>
               <Row label="Completed">{formatDate(task.completedAt)}</Row>
               <Row label="Created by">{task.createdBy.name}</Row>
-              <div className="space-y-1.5 pt-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Progress</span>
-                  <span className="tabular-nums">{task.completion}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn("h-full rounded-full", task.status === "COMPLETED" ? "bg-emerald-500" : "bg-primary")}
-                    style={{ width: `${task.completion}%` }}
-                  />
-                </div>
-              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Update progress</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MyTaskControls task={{ id: task.id, status: task.status, completion: task.completion }} />
             </CardContent>
           </Card>
 

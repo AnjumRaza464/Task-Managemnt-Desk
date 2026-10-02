@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { requireManager } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
 import { logActivity, notifyManagers } from "@/lib/activity";
-import { parseDateInput, today } from "@/lib/dates";
+import { parseDateInput } from "@/lib/dates";
+import { normalizeProgress, progressForCompletionChange, progressForStatusChange } from "@/lib/task-progress";
 import {
   reassignSchema,
   taskCompletionSchema,
@@ -13,7 +14,6 @@ import {
   taskStatusUpdateSchema,
 } from "@/lib/validations/task";
 import type { Prisma } from "@/generated/prisma/client";
-import type { TaskStatus } from "@/generated/prisma/enums";
 
 type Tx = Prisma.TransactionClient;
 
@@ -32,33 +32,6 @@ async function resolvePlan(tx: Tx, assigneeId: string, dueDate: Date) {
     update: {},
     create: { userId: assigneeId, year, month },
   });
-}
-
-/** Keeps status, completion and completedAt consistent with each other and the due date. */
-function normalizeProgress(
-  status: TaskStatus,
-  completion: number,
-  dueDate: Date,
-  previousStatus?: TaskStatus,
-) {
-  let nextStatus = status;
-  let nextCompletion = completion;
-
-  if (nextStatus === "COMPLETED") nextCompletion = 100;
-  else if (nextCompletion === 100 && nextStatus !== "CANCELLED") nextStatus = "COMPLETED";
-  else if (nextCompletion > 0 && nextStatus === "PENDING") nextStatus = "IN_PROGRESS";
-
-  if ((nextStatus === "PENDING" || nextStatus === "IN_PROGRESS") && dueDate < today()) {
-    nextStatus = "OVERDUE";
-  }
-  if (nextStatus === "OVERDUE" && dueDate >= today()) {
-    nextStatus = nextCompletion > 0 ? "IN_PROGRESS" : "PENDING";
-  }
-
-  const completedAt =
-    nextStatus === "COMPLETED" ? (previousStatus === "COMPLETED" ? undefined : new Date()) : null;
-
-  return { status: nextStatus, completion: nextCompletion, completedAt };
 }
 
 async function assertActiveUser(tx: Tx, userId: string) {
@@ -207,12 +180,7 @@ export async function updateTaskStatus(input: unknown) {
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: { assignee: { select: { name: true } } } });
       if (!existing) throw new ActionError("Task not found.");
-      const progress = normalizeProgress(status, existing.completion, existing.dueDate, existing.status);
-      // Explicit moves out of COMPLETED should reset completion below 100.
-      if (existing.status === "COMPLETED" && status !== "COMPLETED" && progress.completion === 100) {
-        progress.completion = 90;
-        progress.status = status === "CANCELLED" ? "CANCELLED" : existing.dueDate < today() ? "OVERDUE" : status;
-      }
+      const progress = progressForStatusChange(existing, status);
       const lastPosition = await tx.task.aggregate({ _max: { position: true }, where: { status: progress.status } });
       const updated = await tx.task.update({
         where: { id },
@@ -263,9 +231,7 @@ export async function updateTaskCompletion(input: unknown) {
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: { assignee: { select: { name: true } } } });
       if (!existing) throw new ActionError("Task not found.");
-      let baseStatus = existing.status;
-      if (existing.status === "COMPLETED" && completion < 100) baseStatus = "IN_PROGRESS";
-      const progress = normalizeProgress(baseStatus, completion, existing.dueDate, existing.status);
+      const progress = progressForCompletionChange(existing, completion);
       const updated = await tx.task.update({
         where: { id },
         data: {

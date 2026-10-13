@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -29,10 +30,13 @@ export function MemberHeaderActions({ user }: { user: CurrentUser }) {
           <ChevronDown className="size-3.5 text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-52">
-          <DropdownMenuLabel className="font-normal">
-            <p className="text-sm font-medium">{user.name}</p>
-            <p className="text-xs text-muted-foreground">{user.email}</p>
-          </DropdownMenuLabel>
+          {/* GroupLabel must live inside a Group (Base UI error #31 otherwise). */}
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="font-normal">
+              <p className="text-sm font-medium">{user.name}</p>
+              <p className="text-xs text-muted-foreground">{user.email}</p>
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onClick={() => logoutAction()}>
             <LogOut /> Sign out

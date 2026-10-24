@@ -13,8 +13,10 @@ class InactiveAccount extends CredentialsSignin {
   code = "inactive";
 }
 
+// The identifier is matched against User.email but need not be a valid email
+// address, so a plain username such as "admin" can sign in too.
 const credentialsSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: z.string().trim().toLowerCase().min(1),
   password: z.string().min(1),
 });
 

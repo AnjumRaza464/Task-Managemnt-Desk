@@ -25,7 +25,7 @@ export async function loginAction(
       if (code === "inactive") {
         return { error: "This account has been deactivated. Contact an administrator." };
       }
-      return { error: "Invalid email or password." };
+      return { error: "Invalid username or password." };
     }
     // Next.js redirect() throws — rethrow so the navigation happens.
     throw error;

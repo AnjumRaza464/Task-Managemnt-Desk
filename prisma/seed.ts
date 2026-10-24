@@ -32,7 +32,8 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email },
-    update: { name, role: "ADMIN", isActive: true },
+    // Re-running the seed resets the admin password to SEED_ADMIN_PASSWORD.
+    update: { name, role: "ADMIN", isActive: true, passwordHash },
     create: {
       email,
       name,

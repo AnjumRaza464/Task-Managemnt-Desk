@@ -3,6 +3,7 @@ import { CalendarCheck2 } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { APP_NAME } from "@/lib/constants";
 import { MemberHeaderActions } from "@/components/layout/member-header-actions";
+import { ChatWidget } from "@/components/chat/chat-widget";
 
 export default async function MemberLayout({ children }: LayoutProps<"/">) {
   const user = await requireMemberPage();
@@ -24,6 +25,7 @@ export default async function MemberLayout({ children }: LayoutProps<"/">) {
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-6">{children}</main>
+      <ChatWidget currentUser={user} />
     </div>
   );
 }

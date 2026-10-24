@@ -38,26 +38,33 @@ enum NotificationType {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String?
-  role         Role     @default(MEMBER)
-  designation  String?
-  department   String?
-  phone        String?
-  avatarUrl    String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  passwordHash   String?
+  role           Role      @default(MEMBER)
+  designation    String?
+  department     String?
+  phone          String?
+  avatarUrl      String?
+  isActive       Boolean   @default(true)
+  lastSeenAt     DateTime?
+  /**
+   * When the user last opened the shared team channel.
+   */
+  teamChatReadAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  plans         MonthlyPlan[]
-  assignedTasks Task[]         @relation("TaskAssignee")
-  createdTasks  Task[]         @relation("TaskCreator")
-  comments      Comment[]
-  attachments   Attachment[]
-  activityLogs  ActivityLog[]
-  notifications Notification[]
+  plans            MonthlyPlan[]
+  assignedTasks    Task[]         @relation("TaskAssignee")
+  createdTasks     Task[]         @relation("TaskCreator")
+  comments         Comment[]
+  attachments      Attachment[]
+  activityLogs     ActivityLog[]
+  notifications    Notification[]
+  sentMessages     ChatMessage[]  @relation("MessageSender")
+  receivedMessages ChatMessage[]  @relation("MessageRecipient")
 
   @@index([role, isActive])
 }
@@ -197,4 +204,24 @@ model Notification {
   task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
+}
+
+model ChatMessage {
+  id          String    @id @default(cuid())
+  senderId    String
+  /**
+   * Null for messages posted in the shared team channel.
+   */
+  recipientId String?
+  content     String
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  sender    User  @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User? @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, senderId, createdAt])
+  @@index([recipientId, readAt])
+  @@index([recipientId, createdAt])
 }

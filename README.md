@@ -22,6 +22,7 @@ Monthly task planning and tracking for small teams. Managers create users, plan 
 - **Automatic status rules**: 100 % completion marks a task completed; past-due open tasks become overdue on page load; notifications are raised for assignments, completions, overdue and due-today tasks and comments.
 - **Reports**: monthly, user performance, by status and by priority, scoped to a month or all time, each exportable to CSV or Excel.
 - **Settings**: profile, password, task categories, light/dark theme.
+- **Chat**: a chat box docked in the bottom-right corner on every page with two tabs. **Team** is a shared channel that every active user can read and post in; **Direct** holds private one-to-one conversations. Both show unread counts and who is online. Delivery and presence use short polling of the database, so no extra service is needed.
 
 ## Getting started
 
@@ -98,13 +99,14 @@ src/
                      tasks/kanban, tasks/[id], calendar, reports,
                      notifications, settings
     (member)/        member area: my-tasks (view, update status and progress)
-    api/             auth, attachment download, report export
+    api/             auth, attachment download, report export, chat sync
   actions/           server actions (one file per module, Zod validated)
   lib/
     queries/         read queries used by pages
     validations/     Zod schemas
     auth-guard.ts    requireManager / requireMemberPage helpers
     overdue.ts       marks past-due tasks overdue and raises notifications
+    chat.ts          direct-message queries, presence and read tracking
     export.ts        CSV / XLSX builders
   components/        ui (shadcn), layout, and one folder per feature
   proxy.ts           route protection (Next.js 16 proxy, formerly middleware)
@@ -115,6 +117,13 @@ src/
 - `src/proxy.ts` redirects guests to `/login`, keeps members inside `/my-tasks`, and keeps managers out of the member area.
 - Every manager page calls `requireManagerPage()` and every server action calls `requireManager()`, which re-validate the user against the database so deactivation takes effect immediately.
 - `ADMIN` and `MANAGER` currently have identical permissions.
+- Chat is available to every active user. The sync endpoint and the send action verify the signed-in user and only return conversations they are part of.
+
+## Chat and presence
+
+- Messages live in the `ChatMessage` table. A null `recipientId` means the message is in the shared team channel. `User.lastSeenAt` records activity and `User.teamChatReadAt` records when the user last opened the team channel.
+- The widget polls `POST /api/chat/sync` every 3 s while the team channel or a conversation is open, 6 s with the contact list open and 15 s while closed. Each poll refreshes the caller's presence (written at most every 20 s), returns contacts with unread counts and the team unread count, and, for an open channel or conversation, marks it read and returns new messages.
+- A user counts as online if they synced within the last 60 seconds. Polling pauses while the browser tab is hidden.
 
 ## Deployment
 

@@ -3,10 +3,13 @@ import { CalendarCheck2 } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { APP_NAME } from "@/lib/constants";
 import { MemberHeaderActions } from "@/components/layout/member-header-actions";
+import { MemberNav } from "@/components/layout/member-nav";
+import { getUnseenFileCount } from "@/lib/queries/files";
 import { ChatWidget } from "@/components/chat/chat-widget";
 
 export default async function MemberLayout({ children }: LayoutProps<"/">) {
   const user = await requireMemberPage();
+  const unseenFiles = await getUnseenFileCount(user.id);
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -18,7 +21,7 @@ export default async function MemberLayout({ children }: LayoutProps<"/">) {
             </span>
             {APP_NAME}
           </Link>
-          <span className="hidden text-sm text-muted-foreground sm:inline">· My tasks</span>
+          <MemberNav unseenFiles={unseenFiles} />
           <div className="ml-auto">
             <MemberHeaderActions user={user} />
           </div>

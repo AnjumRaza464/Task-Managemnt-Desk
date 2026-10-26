@@ -6,6 +6,8 @@ const { auth } = NextAuth(authConfig);
 
 const PUBLIC_PATHS = ["/login"];
 const MEMBER_PREFIX = "/my-tasks";
+const MEMBER_PREFIXES = ["/my-tasks", "/my-files"];
+const isMemberPath = (pathname: string) => MEMBER_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
 export default auth((req) => {
   const { nextUrl } = req;
@@ -31,11 +33,11 @@ export default auth((req) => {
   }
 
   // Members may only use their own read-only area (and API routes, which check ownership themselves).
-  if (isMember && !pathname.startsWith(MEMBER_PREFIX) && !isApi) {
+  if (isMember && !isMemberPath(pathname) && !isApi) {
     return NextResponse.redirect(new URL(MEMBER_PREFIX, nextUrl));
   }
   // Managers do not use the member area.
-  if (!isMember && pathname.startsWith(MEMBER_PREFIX)) {
+  if (!isMember && isMemberPath(pathname)) {
     return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 

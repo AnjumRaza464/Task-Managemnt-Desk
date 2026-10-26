@@ -92,3 +92,6 @@ export const MONTH_NAMES = [
 
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5 MB
 export const PAGE_SIZE = 20;
+
+/** Kept under Vercel's 4.5 MB request body limit (file + form overhead). */
+export const MAX_SHARED_FILE_BYTES = 4 * 1024 * 1024; // 4 MB

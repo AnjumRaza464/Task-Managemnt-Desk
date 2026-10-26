@@ -9,7 +9,7 @@ export async function logActivity(
   input: {
     actorId: string;
     action: string;
-    entity: "Task" | "User" | "MonthlyPlan" | "Category" | "SubTask" | "Comment" | "Attachment";
+    entity: "Task" | "User" | "MonthlyPlan" | "Category" | "SubTask" | "Comment" | "Attachment" | "SharedFile";
     entityId: string;
     taskId?: string | null;
     details?: Prisma.InputJsonValue;

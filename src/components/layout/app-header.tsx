@@ -19,6 +19,7 @@ const TITLES: Array<[string, string]> = [
   ["/calendar", "Calendar"],
   ["/reports", "Reports"],
   ["/attendance", "Attendance"],
+  ["/files", "Shared files"],
   ["/notifications", "Notifications"],
   ["/settings", "Settings"],
 ];

@@ -18,6 +18,8 @@ const ACTION_LABELS: Record<string, string> = {
   COMMENT_DELETED: "deleted a comment",
   ATTACHMENT_ADDED: "attached a file",
   ATTACHMENT_DELETED: "removed a file",
+  FILE_SHARED: "shared a file",
+  FILE_UNSHARED: "removed a shared file",
   USER_CREATED: "created a user",
   USER_UPDATED: "updated a user",
   USER_ACTIVATED: "activated a user",
@@ -84,6 +86,8 @@ export function activityDetail(action: string, raw: unknown): string {
       return typeof details.excerpt === "string" ? `"${details.excerpt}"` : "";
     case "ATTACHMENT_ADDED":
     case "ATTACHMENT_DELETED":
+    case "FILE_SHARED":
+    case "FILE_UNSHARED":
       return typeof details.fileName === "string" ? details.fileName : "";
     case "TASK_CREATED":
       return typeof details.assignee === "string" ? `assigned to ${details.assignee}` : "";

@@ -9,6 +9,7 @@ import {
   CalendarClock,
   CheckCheck,
   CheckCircle2,
+  FolderOpen,
   Info,
   Loader2,
   MessageSquare,
@@ -44,6 +45,7 @@ const ICONS: Record<NotificationType, { icon: LucideIcon; tone: string }> = {
   TASK_OVERDUE: { icon: AlertTriangle, tone: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
   TASK_DUE_TODAY: { icon: CalendarClock, tone: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
   COMMENT_ADDED: { icon: MessageSquare, tone: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
+  FILE_SHARED: { icon: FolderOpen, tone: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
   SYSTEM: { icon: Info, tone: "bg-muted text-muted-foreground" },
 };
 
@@ -171,6 +173,17 @@ export function NotificationList({
                       className="mt-1 inline-block text-xs font-medium text-primary hover:underline"
                     >
                       Open task →
+                    </Link>
+                  )}
+                  {n.type === "FILE_SHARED" && (
+                    <Link
+                      href="/files"
+                      onClick={() => {
+                        if (!n.isRead) void markNotificationRead(n.id, true);
+                      }}
+                      className="mt-1 inline-block text-xs font-medium text-primary hover:underline"
+                    >
+                      Open files →
                     </Link>
                   )}
                 </div>

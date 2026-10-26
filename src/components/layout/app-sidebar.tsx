@@ -14,6 +14,7 @@ import {
   Settings,
   CalendarCheck2,
   Timer,
+  FolderOpen,
 } from "lucide-react";
 import {
   Sidebar,
@@ -46,6 +47,7 @@ const NAV = [
       { title: "All Tasks", href: "/tasks", icon: ListTodo, exact: true },
       { title: "Kanban", href: "/tasks/kanban", icon: KanbanSquare },
       { title: "Calendar", href: "/calendar", icon: CalendarDays },
+      { title: "Files", href: "/files", icon: FolderOpen },
     ],
   },
   {

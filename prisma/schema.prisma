@@ -40,6 +40,7 @@ enum NotificationType {
   TASK_DUE_TODAY
   COMMENT_ADDED
   SYSTEM
+  FILE_SHARED
 }
 
 model User {
@@ -71,6 +72,8 @@ model User {
   sentMessages     ChatMessage[]  @relation("MessageSender")
   receivedMessages ChatMessage[]  @relation("MessageRecipient")
   workSessions     WorkSession[]
+  sharedFiles      SharedFile[]          @relation("SharedFileOwner")
+  receivedFiles    SharedFileRecipient[]
 
   @@index([role, isActive])
 }
@@ -262,4 +265,47 @@ model WorkSession {
   @@index([userId, startedAt])
   @@index([loginId, startedAt])
   @@index([startedAt])
+}
+
+/**
+ * A document, PDF or image a manager shares with every user or with chosen users.
+ */
+model SharedFile {
+  id         String   @id @default(cuid())
+  sharedById String
+  fileName   String
+  mimeType   String
+  size       Int
+  data       Bytes
+  /**
+   * Optional message shown next to the file.
+   */
+  note       String?
+  /**
+   * True when every active user can see it; otherwise only the recipients.
+   */
+  isPublic   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sharedBy   User                  @relation("SharedFileOwner", fields: [sharedById], references: [id], onDelete: Cascade)
+  recipients SharedFileRecipient[]
+
+  @@index([sharedById, createdAt])
+  @@index([isPublic, createdAt])
+}
+
+/**
+ * Who a file was shared with, and when they first opened it. For public files
+ * a row is only created once the user opens the file.
+ */
+model SharedFileRecipient {
+  fileId   String
+  userId   String
+  viewedAt DateTime?
+
+  file SharedFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([fileId, userId])
+  @@index([userId])
 }

@@ -28,6 +28,11 @@ enum Priority {
   CRITICAL
 }
 
+enum WorkSessionEnd {
+  LOGOUT
+  TIMEOUT
+}
+
 enum NotificationType {
   TASK_ASSIGNED
   TASK_COMPLETED
@@ -65,6 +70,7 @@ model User {
   notifications    Notification[]
   sentMessages     ChatMessage[]  @relation("MessageSender")
   receivedMessages ChatMessage[]  @relation("MessageRecipient")
+  workSessions     WorkSession[]
 
   @@index([role, isActive])
 }
@@ -224,4 +230,36 @@ model ChatMessage {
   @@index([recipientId, senderId, createdAt])
   @@index([recipientId, readAt])
   @@index([recipientId, createdAt])
+}
+
+/**
+ * A continuous stretch of portal use, used for check-in / check-out tracking.
+ * Opened at sign-in (or when activity resumes after a long idle gap or on a new
+ * day) and closed at sign-out or once the user goes idle.
+ */
+model WorkSession {
+  id            String          @id @default(cuid())
+  userId        String
+  /**
+   * Identifies the sign-in (kept in the JWT); one sign-in may span several sessions.
+   */
+  loginId       String
+  /**
+   * False for a real sign-in, true when the session was reopened after an idle gap.
+   */
+  resumed       Boolean         @default(false)
+  startedAt     DateTime        @default(now())
+  lastActiveAt  DateTime        @default(now())
+  endedAt       DateTime?
+  endReason     WorkSessionEnd?
+  /**
+   * Time the user was actually active (tab visible and recently interacted with).
+   */
+  activeSeconds Int             @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+  @@index([loginId, startedAt])
+  @@index([startedAt])
 }

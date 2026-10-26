@@ -1,7 +1,8 @@
 "use server";
 
 import { AuthError } from "next-auth";
-import { signIn, signOut } from "@/auth";
+import { auth, signIn, signOut } from "@/auth";
+import { endWorkSession, loginIdFor } from "@/lib/attendance";
 
 export type LoginState = { error?: string } | undefined;
 
@@ -33,5 +34,12 @@ export async function loginAction(
 }
 
 export async function logoutAction() {
+  // Check-out: close the work session opened by this sign-in.
+  const session = await auth();
+  if (session?.user?.id) {
+    await endWorkSession(session.user.id, loginIdFor(session.user)).catch((error) => {
+      console.error("Failed to record check-out", error);
+    });
+  }
   await signOut({ redirectTo: "/login" });
 }

@@ -13,6 +13,7 @@ import {
   Bell,
   Settings,
   CalendarCheck2,
+  Timer,
 } from "lucide-react";
 import {
   Sidebar,
@@ -51,6 +52,7 @@ const NAV = [
     label: "Insights",
     items: [
       { title: "Reports", href: "/reports", icon: BarChart3 },
+      { title: "Attendance", href: "/attendance", icon: Timer },
       { title: "Notifications", href: "/notifications", icon: Bell },
       { title: "Settings", href: "/settings", icon: Settings },
     ],

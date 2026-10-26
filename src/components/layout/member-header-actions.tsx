@@ -14,12 +14,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { ActivityTracker } from "@/components/attendance/activity-tracker";
 import { getInitials } from "@/lib/utils";
 import type { CurrentUser } from "@/lib/auth-guard";
 
 export function MemberHeaderActions({ user }: { user: CurrentUser }) {
   return (
     <div className="flex items-center gap-1">
+      <ActivityTracker />
       <ThemeToggle />
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2 pl-1.5" />}>

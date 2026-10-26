@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "@/auth.config";
 import { prisma } from "@/lib/prisma";
+import { startWorkSession } from "@/lib/attendance";
 
 class InvalidCredentials extends CredentialsSignin {
   code = "invalid_credentials";
@@ -44,11 +45,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) throw new InvalidCredentials();
 
+        // Check-in: every successful sign-in opens a tracked work session.
+        const loginId = await startWorkSession(user.id);
+
         return {
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
+          loginId,
         };
       },
     }),

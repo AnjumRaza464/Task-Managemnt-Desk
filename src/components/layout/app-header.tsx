@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { ActivityTracker } from "@/components/attendance/activity-tracker";
 import { APP_NAME } from "@/lib/constants";
 
 const TITLES: Array<[string, string]> = [
@@ -17,6 +18,7 @@ const TITLES: Array<[string, string]> = [
   ["/tasks", "Tasks"],
   ["/calendar", "Calendar"],
   ["/reports", "Reports"],
+  ["/attendance", "Attendance"],
   ["/notifications", "Notifications"],
   ["/settings", "Settings"],
 ];
@@ -34,6 +36,7 @@ export function AppHeader({ unreadCount }: { unreadCount: number }) {
       <Separator orientation="vertical" className="mr-2 h-4" />
       <h1 className="text-sm font-medium">{titleFor(pathname)}</h1>
       <div className="ml-auto flex items-center gap-1">
+        <ActivityTracker />
         <Button
           variant="ghost"
           size="icon"

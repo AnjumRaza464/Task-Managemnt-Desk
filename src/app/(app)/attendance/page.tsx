@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DayPicker } from "@/components/attendance/day-picker";
+import { LocalTime } from "@/components/shared/local-time";
 
 export const metadata: Metadata = { title: "Attendance" };
 
@@ -38,6 +39,11 @@ const STATUS: Record<AttendanceStatus, { label: string; className: string }> = {
     className: "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-500/15 dark:text-zinc-400 dark:border-zinc-500/30",
   },
 };
+
+/** Clock time in the viewer's time zone, server-rendered in APP_TIME_ZONE. */
+function ClockTime({ date }: { date: Date | null | undefined }) {
+  return <LocalTime date={date} fallback={formatClock(date)} />;
+}
 
 export default async function AttendancePage({ searchParams }: PageProps<"/attendance">) {
   await requireManagerPage();
@@ -113,12 +119,12 @@ export default async function AttendancePage({ searchParams }: PageProps<"/atten
                     {STATUS[r.status].label}
                   </Badge>
                   {r.status === "away" && r.lastActiveAt && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">last active {formatClock(r.lastActiveAt)}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">last active <ClockTime date={r.lastActiveAt} /></p>
                   )}
                 </TableCell>
-                <TableCell className="tabular-nums">{formatClock(r.checkIn)}</TableCell>
+                <TableCell className="tabular-nums"><ClockTime date={r.checkIn} /></TableCell>
                 <TableCell className="tabular-nums">
-                  {r.checkIn && !r.checkOut ? <span className="text-muted-foreground">Still checked in</span> : formatClock(r.checkOut)}
+                  {r.checkIn && !r.checkOut ? <span className="text-muted-foreground">Still checked in</span> : <ClockTime date={r.checkOut} />}
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
                   {r.sessionCount ? formatDuration(r.activeSeconds) : "—"}
@@ -170,7 +176,7 @@ export default async function AttendancePage({ searchParams }: PageProps<"/atten
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">{s.userName}</TableCell>
                       <TableCell className="tabular-nums">
-                        {formatClock(s.startedAt)}
+                        <ClockTime date={s.startedAt} />
                         <span className="ml-1.5 text-xs text-muted-foreground">{s.resumed ? "resumed" : "signed in"}</span>
                       </TableCell>
                       <TableCell className="tabular-nums">
@@ -178,7 +184,7 @@ export default async function AttendancePage({ searchParams }: PageProps<"/atten
                           <span className="text-emerald-600 dark:text-emerald-400">In progress</span>
                         ) : (
                           <>
-                            {formatClock(s.endedAt)}
+                            <ClockTime date={s.endedAt} />
                             <span className="ml-1.5 text-xs text-muted-foreground">
                               {s.endReason === "LOGOUT" ? "signed out" : "went idle"}
                             </span>

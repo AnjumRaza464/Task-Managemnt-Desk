@@ -2,9 +2,10 @@ import "server-only";
 
 /**
  * Time zone that defines "a day" for attendance and the times shown to admins.
- * Set APP_TIME_ZONE (e.g. "Asia/Karachi") in production, where the server runs in UTC.
+ * Defaults to Asia/Karachi; override with APP_TIME_ZONE. The server itself runs in UTC on Vercel,
+ * so never fall back to the server's own zone.
  */
-export const APP_TIME_ZONE = process.env.APP_TIME_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
+export const APP_TIME_ZONE = process.env.APP_TIME_ZONE || "Asia/Karachi";
 
 const partsFormat = new Intl.DateTimeFormat("en-US", {
   timeZone: APP_TIME_ZONE,

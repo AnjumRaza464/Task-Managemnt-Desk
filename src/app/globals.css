@@ -48,74 +48,78 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* UniKyn brand palette (unikyn.com): cream #fffaf5, ink #130a12, pink #f02b9b, soft pink #f6b8e0. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary:oklch(0.55 0.21 277);
-  --primary-foreground:oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: #fffaf5;
+  --foreground: #130a12;
+  --card: #ffffff;
+  --card-foreground: #130a12;
+  --popover: #ffffff;
+  --popover-foreground: #130a12;
+  --primary: #e11d8f;
+  --primary-foreground: #fffaf5;
+  --secondary: #fbeaf3;
+  --secondary-foreground: #130a12;
+  --muted: #f7eef3;
+  --muted-foreground: #7b6f7c;
+  --accent: #fbe3f0;
+  --accent-foreground: #130a12;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring:oklch(0.65 0.18 277);
-  --chart-1:oklch(0.62 0.2 277);
-  --chart-2:oklch(0.7 0.16 160);
-  --chart-3:oklch(0.78 0.16 75);
-  --chart-4:oklch(0.65 0.2 25);
-  --chart-5:oklch(0.7 0.13 220);
+  --border: #efdce7;
+  --input: #efdce7;
+  --ring: #f02b9b;
+  --chart-1: #f02b9b;
+  --chart-2: #f6b8e0;
+  --chart-3: #f5b74f;
+  --chart-4: #ef5350;
+  --chart-5: #7c8cf8;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary:oklch(0.55 0.21 277);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring:oklch(0.65 0.18 277);
+  --sidebar: #fdf4f9;
+  --sidebar-foreground: #130a12;
+  --sidebar-primary: #e11d8f;
+  --sidebar-primary-foreground: #fffaf5;
+  --sidebar-accent: #f9e3ef;
+  --sidebar-accent-foreground: #130a12;
+  --sidebar-border: #f0dbe8;
+  --sidebar-ring: #f02b9b;
 }
 
+
+/* Mirrors unikyn.com: bg #080609, cards #130a12, lines rgba(255,255,255,.13), muted #b8aeb9. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary:oklch(0.7 0.17 277);
-  --primary-foreground:oklch(0.145 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: #080609;
+  --foreground: #fffaf5;
+  --card: #130a12;
+  --card-foreground: #fffaf5;
+  --popover: #1a0f19;
+  --popover-foreground: #fffaf5;
+  --primary: #f02b9b;
+  --primary-foreground: #fffaf5;
+  --secondary: #1e1220;
+  --secondary-foreground: #fffaf5;
+  --muted: #1a0f19;
+  --muted-foreground: #b8aeb9;
+  --accent: #241526;
+  --accent-foreground: #fffaf5;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring:oklch(0.6 0.18 277);
-  --chart-1:oklch(0.7 0.17 277);
-  --chart-2:oklch(0.75 0.15 160);
-  --chart-3:oklch(0.82 0.15 75);
-  --chart-4:oklch(0.7 0.19 25);
-  --chart-5:oklch(0.75 0.12 220);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary:oklch(0.7 0.17 277);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring:oklch(0.6 0.18 277);
+  --border: rgba(255, 255, 255, 0.13);
+  --input: rgba(255, 255, 255, 0.16);
+  --ring: #f02b9b;
+  --chart-1: #f02b9b;
+  --chart-2: #f6b8e0;
+  --chart-3: #f5c26b;
+  --chart-4: #ff6b6b;
+  --chart-5: #8ab4f8;
+  --sidebar: #0b070c;
+  --sidebar-foreground: #fffaf5;
+  --sidebar-primary: #f02b9b;
+  --sidebar-primary-foreground: #fffaf5;
+  --sidebar-accent: #1a0f19;
+  --sidebar-accent-foreground: #fffaf5;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #f02b9b;
 }
+
 
 @layer base {
   * {

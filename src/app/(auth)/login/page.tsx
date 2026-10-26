@@ -16,25 +16,25 @@ export default async function LoginPage({
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-primary text-primary-foreground lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <div className="absolute -top-32 -right-32 size-96 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-24 size-[28rem] rounded-full bg-black/20 blur-3xl" />
+      <div className="dark relative hidden overflow-hidden bg-background text-foreground lg:flex lg:flex-col lg:justify-between lg:p-12">
+        <div className="absolute -top-32 -right-32 size-96 rounded-full bg-primary/30 blur-3xl" />
+        <div className="absolute -bottom-40 -left-24 size-[28rem] rounded-full bg-primary/15 blur-3xl" />
         <div className="relative flex items-center gap-2 text-lg font-semibold">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-white/15">
+          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <CalendarCheck2 className="size-5" />
           </span>
           {APP_NAME}
         </div>
         <div className="relative max-w-md space-y-4">
           <h1 className="text-4xl font-semibold leading-tight tracking-tight">
-            Plan every month. Track every task.
+            Plan every month. <span className="text-primary">Track every task.</span>
           </h1>
-          <p className="text-primary-foreground/80">
+          <p className="text-muted-foreground">
             {APP_DESCRIPTION}. Assign work, follow progress and report results
             from one place.
           </p>
         </div>
-        <p className="relative text-xs text-primary-foreground/60">
+        <p className="relative text-xs text-muted-foreground/70">
           Managers plan and assign work; team members sign in to view their own tasks.
         </p>
       </div>

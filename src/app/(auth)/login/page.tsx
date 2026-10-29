@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { CalendarCheck2 } from "lucide-react";
 import { LoginForm } from "@/components/auth/login-form";
 import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
+import { BrandLogo, BrandMark } from "@/components/shared/brand-logo";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -19,11 +19,9 @@ export default async function LoginPage({
       <div className="dark relative hidden overflow-hidden bg-background text-foreground lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div className="absolute -top-32 -right-32 size-96 rounded-full bg-primary/30 blur-3xl" />
         <div className="absolute -bottom-40 -left-24 size-[28rem] rounded-full bg-primary/15 blur-3xl" />
-        <div className="relative flex items-center gap-2 text-lg font-semibold">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <CalendarCheck2 className="size-5" />
-          </span>
-          {APP_NAME}
+        <div className="relative flex items-center gap-3 text-lg font-semibold">
+          <BrandLogo plain className="h-12" />
+          <span className="sr-only">{APP_NAME}</span>
         </div>
         <div className="relative max-w-md space-y-4">
           <h1 className="text-4xl font-semibold leading-tight tracking-tight">
@@ -43,9 +41,7 @@ export default async function LoginPage({
         <div className="w-full max-w-sm space-y-8">
           <div className="space-y-2">
             <div className="flex items-center gap-2 font-semibold lg:hidden">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <CalendarCheck2 className="size-4" />
-              </span>
+              <BrandMark />
               {APP_NAME}
             </div>
             <h2 className="text-2xl font-semibold tracking-tight">Welcome back</h2>

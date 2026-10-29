@@ -12,7 +12,6 @@ import {
   BarChart3,
   Bell,
   Settings,
-  CalendarCheck2,
   Timer,
   FolderOpen,
 } from "lucide-react";
@@ -31,6 +30,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { APP_NAME } from "@/lib/constants";
+import { BrandMark } from "@/components/shared/brand-logo";
 import { UserMenu } from "@/components/layout/user-menu";
 import { NavLinkIcon } from "@/components/layout/nav-pending";
 import type { CurrentManager } from "@/lib/auth-guard";
@@ -87,9 +87,7 @@ export function AppSidebar({
               render={<Link href="/dashboard" />}
               className="data-[state=open]:bg-sidebar-accent"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <CalendarCheck2 className="size-4" />
-              </div>
+              <BrandMark />
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{APP_NAME}</span>
                 <span className="truncate text-xs text-muted-foreground">

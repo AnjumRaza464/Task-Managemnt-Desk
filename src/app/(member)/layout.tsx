@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { CalendarCheck2 } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { APP_NAME } from "@/lib/constants";
+import { BrandMark } from "@/components/shared/brand-logo";
 import { MemberHeaderActions } from "@/components/layout/member-header-actions";
 import { MemberNav } from "@/components/layout/member-nav";
 import { getUnseenFileCount } from "@/lib/queries/files";
@@ -16,9 +16,7 @@ export default async function MemberLayout({ children }: LayoutProps<"/">) {
       <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
           <Link href="/my-tasks" className="flex items-center gap-2 font-semibold">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <CalendarCheck2 className="size-4" />
-            </span>
+            <BrandMark />
             {APP_NAME}
           </Link>
           <MemberNav unseenFiles={unseenFiles} />

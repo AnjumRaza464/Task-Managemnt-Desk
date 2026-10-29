@@ -4,14 +4,18 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireManager } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
-import { logActivity, notifyManagers } from "@/lib/activity";
+import { logActivity, notifyManagers, notifyUsers } from "@/lib/activity";
+import { getAppUrl } from "@/lib/app-url";
 import { commentSchema } from "@/lib/validations/task";
 
 export async function addComment(input: unknown) {
   return runAction(async () => {
     const manager = await requireManager();
     const values = commentSchema.parse(input);
-    const task = await prisma.task.findUnique({ where: { id: values.taskId }, select: { id: true, title: true } });
+    const task = await prisma.task.findUnique({
+      where: { id: values.taskId },
+      select: { id: true, title: true, assigneeId: true },
+    });
     if (!task) throw new ActionError("Task not found.");
 
     const comment = await prisma.comment.create({
@@ -30,9 +34,27 @@ export async function addComment(input: unknown) {
       title: "New comment",
       message: `${manager.name} commented on "${task.title}".`,
       taskId: task.id,
+      excludeUserIds: [manager.id, task.assigneeId],
+    });
+    // The assignee gets the comment by email too (unless they wrote it).
+    const appUrl = await getAppUrl();
+    const excerpt = values.content.length > 200 ? `${values.content.slice(0, 200)}…` : values.content;
+    await notifyUsers({
+      userIds: [task.assigneeId],
+      type: "COMMENT_ADDED",
+      title: "New comment on your task",
+      message: `${manager.name} commented on "${task.title}".`,
+      taskId: task.id,
       excludeUserId: manager.id,
+      email: {
+        subject: `New comment on ${task.title}`,
+        heading: "New comment on your task",
+        lines: [`${manager.name} commented on "${task.title}":`, `"${excerpt}"`],
+        cta: { label: "Open task", url: `${appUrl}/tasks/${task.id}` },
+      },
     });
     revalidatePath(`/tasks/${task.id}`);
+    revalidatePath(`/my-tasks/${task.id}`);
     revalidatePath("/notifications");
     return { id: comment.id };
   });

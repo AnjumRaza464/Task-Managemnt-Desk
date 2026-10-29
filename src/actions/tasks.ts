@@ -1,11 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { requireManager } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
-import { logActivity, notifyManagers } from "@/lib/activity";
+import { logActivity, notifyManagers, notifyUsers, type NotificationEmail } from "@/lib/activity";
+import { getAppUrl } from "@/lib/app-url";
+import { PRIORITY_LABELS } from "@/lib/constants";
 import { parseDateInput } from "@/lib/dates";
+import { resolvePlan, spawnNextOccurrence } from "@/lib/recurrence";
 import { normalizeProgress, progressForCompletionChange, progressForStatusChange } from "@/lib/task-progress";
 import {
   reassignSchema,
@@ -14,6 +18,7 @@ import {
   taskStatusUpdateSchema,
 } from "@/lib/validations/task";
 import type { Prisma } from "@/generated/prisma/client";
+import type { Priority } from "@/generated/prisma/enums";
 
 type Tx = Prisma.TransactionClient;
 
@@ -23,22 +28,38 @@ export async function revalidateTaskViews(taskId?: string) {
   if (taskId) revalidatePath(`/tasks/${taskId}`);
 }
 
-/** Finds or creates the (user, year, month) plan a task belongs to. */
-async function resolvePlan(tx: Tx, assigneeId: string, dueDate: Date) {
-  const year = dueDate.getFullYear();
-  const month = dueDate.getMonth() + 1;
-  return tx.monthlyPlan.upsert({
-    where: { userId_year_month: { userId: assigneeId, year, month } },
-    update: {},
-    create: { userId: assigneeId, year, month },
-  });
-}
-
 async function assertActiveUser(tx: Tx, userId: string) {
   const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true, name: true, isActive: true } });
   if (!user) throw new ActionError("Assigned user not found.");
   if (!user.isActive) throw new ActionError("Cannot assign tasks to an inactive user.");
   return user;
+}
+
+/** Email for the person a task was (re)assigned to. */
+function assignedEmail(
+  task: { id: string; title: string; dueDate: Date; priority: Priority },
+  by: string,
+  appUrl: string,
+): NotificationEmail {
+  return {
+    subject: `New task: ${task.title}`,
+    heading: "A task was assigned to you",
+    lines: [
+      `${by} assigned you "${task.title}".`,
+      `Due ${format(task.dueDate, "EEEE, MMMM d, yyyy")} · ${PRIORITY_LABELS[task.priority]} priority.`,
+    ],
+    cta: { label: "Open task", url: `${appUrl}/tasks/${task.id}` },
+  };
+}
+
+/** Email for managers when a task is completed. */
+function completedEmail(task: { id: string; title: string }, who: string, appUrl: string): NotificationEmail {
+  return {
+    subject: `Completed: ${task.title}`,
+    heading: "Task completed",
+    lines: [`${who} marked "${task.title}" as completed.`],
+    cta: { label: "View task", url: `${appUrl}/tasks/${task.id}` },
+  };
 }
 
 export async function createTask(input: unknown) {
@@ -47,6 +68,8 @@ export async function createTask(input: unknown) {
     const values = taskSchema.parse(input);
     const dueDate = parseDateInput(values.dueDate);
     const startDate = values.startDate ? parseDateInput(values.startDate) : null;
+    const recurrenceEndsAt = values.recurrence !== "NONE" && values.recurrenceEndsAt ? parseDateInput(values.recurrenceEndsAt) : null;
+    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const assignee = await assertActiveUser(tx, values.assigneeId);
@@ -69,6 +92,8 @@ export async function createTask(input: unknown) {
           startDate,
           dueDate,
           position: (lastPosition._max.position ?? 0) + 1,
+          recurrence: values.recurrence,
+          recurrenceEndsAt,
         },
       });
 
@@ -89,7 +114,19 @@ export async function createTask(input: unknown) {
           title: "Task assigned",
           message: `"${created.title}" was assigned to ${assignee.name}.`,
           taskId: created.id,
+          excludeUserIds: [manager.id, assignee.id],
+        },
+        tx,
+      );
+      await notifyUsers(
+        {
+          userIds: [assignee.id],
+          type: "TASK_ASSIGNED",
+          title: "New task assigned to you",
+          message: `"${created.title}" is due ${format(dueDate, "MMM d")}.`,
+          taskId: created.id,
           excludeUserId: manager.id,
+          email: assignedEmail(created, manager.name, appUrl),
         },
         tx,
       );
@@ -107,6 +144,8 @@ export async function updateTask(id: string, input: unknown) {
     const values = taskSchema.parse(input);
     const dueDate = parseDateInput(values.dueDate);
     const startDate = values.startDate ? parseDateInput(values.startDate) : null;
+    const recurrenceEndsAt = values.recurrence !== "NONE" && values.recurrenceEndsAt ? parseDateInput(values.recurrenceEndsAt) : null;
+    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: { assignee: true } });
@@ -130,6 +169,8 @@ export async function updateTask(id: string, input: unknown) {
           ...(progress.completedAt !== undefined ? { completedAt: progress.completedAt } : {}),
           startDate,
           dueDate,
+          recurrence: values.recurrence,
+          recurrenceEndsAt,
         },
       });
 
@@ -139,6 +180,7 @@ export async function updateTask(id: string, input: unknown) {
       if (existing.assigneeId !== updated.assigneeId) changes.assignee = { from: existing.assignee.name, to: assignee.name };
       if (existing.completion !== updated.completion) changes.completion = { from: existing.completion, to: updated.completion };
       if (existing.dueDate.getTime() !== updated.dueDate.getTime()) changes.dueDate = { from: existing.dueDate, to: updated.dueDate };
+      if (existing.recurrence !== updated.recurrence) changes.recurrence = { from: existing.recurrence, to: updated.recurrence };
 
       await logActivity(
         {
@@ -152,6 +194,21 @@ export async function updateTask(id: string, input: unknown) {
         tx,
       );
 
+      if (existing.assigneeId !== updated.assigneeId) {
+        await notifyUsers(
+          {
+            userIds: [assignee.id],
+            type: "TASK_ASSIGNED",
+            title: "Task assigned to you",
+            message: `"${updated.title}" is now assigned to you · due ${format(updated.dueDate, "MMM d")}.`,
+            taskId: id,
+            excludeUserId: manager.id,
+            email: assignedEmail(updated, manager.name, appUrl),
+          },
+          tx,
+        );
+      }
+
       if (existing.status !== "COMPLETED" && updated.status === "COMPLETED") {
         await notifyManagers(
           {
@@ -159,10 +216,12 @@ export async function updateTask(id: string, input: unknown) {
             title: "Task completed",
             message: `"${updated.title}" (${assignee.name}) was marked completed.`,
             taskId: id,
-            dedupeKey: `COMPLETED:${id}:${Date.now()}`,
+            excludeUserId: manager.id,
+            email: completedEmail(updated, manager.name, appUrl),
           },
           tx,
         );
+        await spawnNextOccurrence(tx, updated, manager.id);
       }
       return updated;
     });
@@ -176,6 +235,7 @@ export async function updateTaskStatus(input: unknown) {
   return runAction(async () => {
     const manager = await requireManager();
     const { id, status } = taskStatusUpdateSchema.parse(input);
+    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: { assignee: { select: { name: true } } } });
@@ -210,9 +270,12 @@ export async function updateTaskStatus(input: unknown) {
               title: "Task completed",
               message: `"${updated.title}" (${existing.assignee.name}) was marked completed.`,
               taskId: id,
+              excludeUserId: manager.id,
+              email: completedEmail(updated, manager.name, appUrl),
             },
             tx,
           );
+          await spawnNextOccurrence(tx, updated, manager.id);
         }
       }
       return updated;
@@ -227,6 +290,7 @@ export async function updateTaskCompletion(input: unknown) {
   return runAction(async () => {
     const manager = await requireManager();
     const { id, completion } = taskCompletionSchema.parse(input);
+    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: { assignee: { select: { name: true } } } });
@@ -258,9 +322,12 @@ export async function updateTaskCompletion(input: unknown) {
             title: "Task completed",
             message: `"${updated.title}" (${existing.assignee.name}) reached 100%.`,
             taskId: id,
+            excludeUserId: manager.id,
+            email: completedEmail(updated, manager.name, appUrl),
           },
           tx,
         );
+        await spawnNextOccurrence(tx, updated, manager.id);
       }
       return updated;
     });
@@ -274,6 +341,7 @@ export async function reassignTask(input: unknown) {
   return runAction(async () => {
     const manager = await requireManager();
     const { id, assigneeId } = reassignSchema.parse(input);
+    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: { assignee: true } });
@@ -299,7 +367,19 @@ export async function reassignTask(input: unknown) {
           title: "Task reassigned",
           message: `"${updated.title}" moved from ${existing.assignee.name} to ${assignee.name}.`,
           taskId: id,
+          excludeUserIds: [manager.id, assignee.id],
+        },
+        tx,
+      );
+      await notifyUsers(
+        {
+          userIds: [assignee.id],
+          type: "TASK_ASSIGNED",
+          title: "Task assigned to you",
+          message: `"${updated.title}" is now assigned to you · due ${format(updated.dueDate, "MMM d")}.`,
+          taskId: id,
           excludeUserId: manager.id,
+          email: assignedEmail(updated, manager.name, appUrl),
         },
         tx,
       );

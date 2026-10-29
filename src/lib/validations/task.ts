@@ -18,6 +18,7 @@ export const TASK_STATUS = z.enum([
   "CANCELLED",
 ]);
 export const PRIORITY = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
+export const RECURRENCE = z.enum(["NONE", "DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY"]);
 
 export const taskSchema = z
   .object({
@@ -38,10 +39,16 @@ export const taskSchema = z
     completion: z.coerce.number().int().min(0).max(100).default(0),
     startDate: optionalDate,
     dueDate: dateString,
+    recurrence: RECURRENCE.default("NONE"),
+    recurrenceEndsAt: optionalDate,
   })
   .refine(
     (v) => !v.startDate || v.startDate <= v.dueDate,
     { message: "Start date cannot be after due date", path: ["startDate"] },
+  )
+  .refine(
+    (v) => v.recurrence === "NONE" || !v.recurrenceEndsAt || v.recurrenceEndsAt >= v.dueDate,
+    { message: "Repeat end date must be on or after the due date", path: ["recurrenceEndsAt"] },
   );
 
 export type TaskInput = z.input<typeof taskSchema>;
@@ -102,6 +109,7 @@ export const categorySchema = z.object({
 export const profileSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.email().trim().toLowerCase(),
+  emailNotifications: z.boolean().default(true),
 });
 
 export const passwordChangeSchema = z
@@ -111,6 +119,22 @@ export const passwordChangeSchema = z
     confirmPassword: z.string(),
   })
   .refine((v) => v.newPassword === v.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+/** "Forgot password" request; the identifier is whatever the user signs in with. */
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().min(3, "Enter the email you sign in with").max(120),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(20, "This reset link is invalid."),
+    password: z.string().min(8, "Password must be at least 8 characters").max(72),
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
   });

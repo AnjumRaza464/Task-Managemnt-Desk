@@ -4,14 +4,16 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireManager } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
-import { logActivity } from "@/lib/activity";
+import { logActivity, notifyUsers } from "@/lib/activity";
+import { getAppUrl } from "@/lib/app-url";
 import { MAX_SHARED_FILE_BYTES } from "@/lib/constants";
 
 const BLOCKED_EXTENSIONS = /\.(exe|bat|cmd|sh|msi|dll|js|jar|ps1|vbs)$/i;
 
 /**
  * Shares an uploaded file with everyone (`audience=all`) or with the users
- * listed in `userIds` (`audience=users`), and notifies each recipient.
+ * listed in `userIds` (`audience=users`), and notifies each recipient in the
+ * app and by email.
  */
 export async function shareFile(formData: FormData) {
   return runAction(async () => {
@@ -38,6 +40,7 @@ export async function shareFile(formData: FormData) {
 
     const bytes = Buffer.from(await file.arrayBuffer());
     const fileName = file.name.slice(0, 200);
+    const appUrl = await getAppUrl();
 
     const shared = await prisma.$transaction(async (tx) => {
       const created = await tx.sharedFile.create({
@@ -64,16 +67,21 @@ export async function shareFile(formData: FormData) {
             ).map((u) => u.id)
           : recipientIds.filter((id) => id !== manager.id);
 
-      if (notifyIds.length > 0) {
-        await tx.notification.createMany({
-          data: notifyIds.map((userId) => ({
-            userId,
-            type: "FILE_SHARED" as const,
-            title: "New file shared with you",
-            message: `${manager.name} shared "${created.fileName}"${note ? ` · ${note}` : ""}`,
-          })),
-        });
-      }
+      await notifyUsers(
+        {
+          userIds: notifyIds,
+          type: "FILE_SHARED",
+          title: "New file shared with you",
+          message: `${manager.name} shared "${created.fileName}"${note ? ` · ${note}` : ""}`,
+          email: {
+            subject: `${manager.name} shared a file with you`,
+            heading: "New file shared with you",
+            lines: [`${manager.name} shared "${created.fileName}"${note ? `: ${note}` : "."}`],
+            cta: { label: "Open files", url: `${appUrl}/files` },
+          },
+        },
+        tx,
+      );
 
       await logActivity(
         {

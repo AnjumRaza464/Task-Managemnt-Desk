@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { PageHeader } from "@/components/shared/page-header";
 import { MyTaskControls } from "@/components/member/my-task-controls";
-import { MONTH_NAMES } from "@/lib/constants";
+import { MONTH_NAMES, RECURRENCE_LABELS } from "@/lib/constants";
 import { cn, formatBytes, formatDate, formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Task" };
@@ -22,6 +22,10 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
   if (!task || task.assigneeId !== user.id) notFound();
 
   const doneSubtasks = task.subtasks.filter((s) => s.isCompleted).length;
+  const repeatLabel =
+    task.recurrence !== "NONE"
+      ? `${RECURRENCE_LABELS[task.recurrence]}${task.recurrenceEndsAt ? ` until ${formatDate(task.recurrenceEndsAt)}` : ""}`
+      : null;
 
   return (
     <>
@@ -114,6 +118,7 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
               </Row>
               <Row label="Start date">{formatDate(task.startDate)}</Row>
               <Row label="Due date">{formatDate(task.dueDate)}</Row>
+              {repeatLabel && <Row label="Repeats">{repeatLabel}</Row>}
               <Row label="Completed">{formatDate(task.completedAt)}</Row>
               <Row label="Created by">{task.createdBy.name}</Row>
             </CardContent>

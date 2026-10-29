@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireMemberPage } from "@/lib/auth-guard";
+import { prisma } from "@/lib/prisma";
 import { APP_NAME } from "@/lib/constants";
 import { BrandMark } from "@/components/shared/brand-logo";
+import { GlobalSearch } from "@/components/layout/global-search";
 import { MemberHeaderActions } from "@/components/layout/member-header-actions";
 import { MemberNav } from "@/components/layout/member-nav";
 import { getUnseenFileCount } from "@/lib/queries/files";
@@ -9,7 +11,10 @@ import { ChatWidget } from "@/components/chat/chat-widget";
 
 export default async function MemberLayout({ children }: LayoutProps<"/">) {
   const user = await requireMemberPage();
-  const unseenFiles = await getUnseenFileCount(user.id);
+  const [unseenFiles, prefs] = await Promise.all([
+    getUnseenFileCount(user.id),
+    prisma.user.findUnique({ where: { id: user.id }, select: { emailNotifications: true } }),
+  ]);
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -20,8 +25,9 @@ export default async function MemberLayout({ children }: LayoutProps<"/">) {
             {APP_NAME}
           </Link>
           <MemberNav unseenFiles={unseenFiles} />
-          <div className="ml-auto">
-            <MemberHeaderActions user={user} />
+          <div className="ml-auto flex items-center gap-1">
+            <GlobalSearch scope="member" />
+            <MemberHeaderActions user={user} emailNotifications={prefs?.emailNotifications ?? true} />
           </div>
         </div>
       </header>

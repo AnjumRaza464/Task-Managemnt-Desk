@@ -18,10 +18,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/shared/select-field";
-import { PRIORITIES, PRIORITY_LABELS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
+import {
+  PRIORITIES,
+  PRIORITY_LABELS,
+  RECURRENCES,
+  RECURRENCE_LABELS,
+  STATUS_LABELS,
+  TASK_STATUSES,
+} from "@/lib/constants";
 import { toDateInputValue } from "@/lib/utils";
 import type { TaskFormOptions } from "@/lib/queries/tasks";
-import type { Priority, TaskStatus } from "@/generated/prisma/enums";
+import type { Priority, Recurrence, TaskStatus } from "@/generated/prisma/enums";
 
 export type TaskFormValues = {
   id?: string;
@@ -34,6 +41,8 @@ export type TaskFormValues = {
   completion: number;
   startDate: string;
   dueDate: string;
+  recurrence: Recurrence;
+  recurrenceEndsAt: string;
 };
 
 export function emptyTaskValues(defaults: Partial<TaskFormValues> = {}): TaskFormValues {
@@ -47,6 +56,8 @@ export function emptyTaskValues(defaults: Partial<TaskFormValues> = {}): TaskFor
     completion: 0,
     startDate: "",
     dueDate: toDateInputValue(new Date()),
+    recurrence: "NONE",
+    recurrenceEndsAt: "",
     ...defaults,
   };
 }
@@ -87,6 +98,7 @@ export function TaskFormDialog({
   const set = <K extends keyof TaskFormValues>(key: K, value: TaskFormValues[K]) =>
     setValues((v) => ({ ...v, [key]: value }));
   const err = (key: string) => errors[key]?.[0];
+  const repeats = values.recurrence !== "NONE";
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -190,6 +202,34 @@ export function TaskFormDialog({
               <Input id="dueDate" type="date" value={values.dueDate} onChange={(e) => set("dueDate", e.target.value)} required />
               {err("dueDate") && <p className="text-xs text-destructive">{err("dueDate")}</p>}
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="recurrence">Repeat</Label>
+              <SelectField
+                id="recurrence"
+                value={values.recurrence}
+                onChange={(v) => set("recurrence", v as Recurrence)}
+                options={RECURRENCES.map((r) => ({ value: r, label: RECURRENCE_LABELS[r] }))}
+              />
+              {repeats && (
+                <p className="text-xs text-muted-foreground">The next occurrence is created when this one is completed.</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="recurrenceEndsAt">Repeat until</Label>
+              <Input
+                id="recurrenceEndsAt"
+                type="date"
+                value={values.recurrenceEndsAt}
+                onChange={(e) => set("recurrenceEndsAt", e.target.value)}
+                disabled={!repeats}
+                min={values.dueDate || undefined}
+              />
+              {err("recurrenceEndsAt") ? (
+                <p className="text-xs text-destructive">{err("recurrenceEndsAt")}</p>
+              ) : (
+                repeats && <p className="text-xs text-muted-foreground">Leave empty to repeat indefinitely.</p>
+              )}
+            </div>
             <div className="space-y-1.5 sm:col-span-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="completion">Completion</Label>
@@ -234,6 +274,8 @@ export function taskToFormValues(task: {
   completion: number;
   startDate: Date | string | null;
   dueDate: Date | string;
+  recurrence?: Recurrence;
+  recurrenceEndsAt?: Date | string | null;
 }): TaskFormValues {
   return {
     id: task.id,
@@ -246,5 +288,7 @@ export function taskToFormValues(task: {
     completion: task.completion,
     startDate: toDateInputValue(task.startDate),
     dueDate: toDateInputValue(task.dueDate),
+    recurrence: task.recurrence ?? "NONE",
+    recurrenceEndsAt: toDateInputValue(task.recurrenceEndsAt ?? null),
   };
 }

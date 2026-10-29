@@ -43,6 +43,14 @@ enum NotificationType {
   FILE_SHARED
 }
 
+enum Recurrence {
+  NONE
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
 model User {
   id             String    @id @default(cuid())
   name           String
@@ -59,6 +67,10 @@ model User {
    * When the user last opened the shared team channel.
    */
   teamChatReadAt DateTime?
+  /**
+   * Receive email for assignments, reminders, comments and shared files.
+   */
+  emailNotifications Boolean @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -74,6 +86,7 @@ model User {
   workSessions     WorkSession[]
   sharedFiles      SharedFile[]          @relation("SharedFileOwner")
   receivedFiles    SharedFileRecipient[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([role, isActive])
 }
@@ -118,6 +131,19 @@ model Task {
   dueDate     DateTime
   completedAt DateTime?
   position    Int        @default(0)
+  /**
+   * Repeat rule; the next occurrence is created when this one is completed.
+   */
+  recurrence          Recurrence @default(NONE)
+  recurrenceEndsAt    DateTime?
+  /**
+   * The first task in a repeating series (null for the first one itself).
+   */
+  recurrenceParentId  String?
+  /**
+   * Set once the next occurrence has been created, so a re-completed task does not spawn twice.
+   */
+  recurrenceSpawnedAt DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -130,6 +156,8 @@ model Task {
   attachments   Attachment[]
   activity      ActivityLog[]
   notifications Notification[]
+  recurrenceParent   Task?  @relation("TaskRecurrence", fields: [recurrenceParentId], references: [id], onDelete: SetNull)
+  recurrenceChildren Task[] @relation("TaskRecurrence")
 
   @@index([assigneeId, status])
   @@index([planId])
@@ -308,4 +336,21 @@ model SharedFileRecipient {
 
   @@id([fileId, userId])
   @@index([userId])
+}
+
+/**
+ * One-time token for "forgot password" links. Only the SHA-256 hash of the
+ * token is stored; the raw token lives in the emailed link.
+ */
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

@@ -1,4 +1,4 @@
-import type { Priority, TaskStatus, Role } from "@/generated/prisma/enums";
+import type { Priority, Recurrence, Role, TaskStatus } from "@/generated/prisma/enums";
 
 export const APP_NAME = "AI Research Lab";
 export const APP_DESCRIPTION = "Monthly task planning & management for managers";
@@ -95,3 +95,13 @@ export const PAGE_SIZE = 20;
 
 /** Kept under Vercel's 4.5 MB request body limit (file + form overhead). */
 export const MAX_SHARED_FILE_BYTES = 4 * 1024 * 1024; // 4 MB
+
+export const RECURRENCES: Recurrence[] = ["NONE", "DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY"];
+
+export const RECURRENCE_LABELS: Record<Recurrence, string> = {
+  NONE: "Does not repeat",
+  DAILY: "Daily",
+  WEEKLY: "Weekly",
+  BIWEEKLY: "Every 2 weeks",
+  MONTHLY: "Monthly",
+};

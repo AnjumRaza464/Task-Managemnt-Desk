@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarRange } from "lucide-react";
+import { ArrowLeft, CalendarRange, Repeat } from "lucide-react";
 import { requireManagerPage } from "@/lib/auth-guard";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { getTaskById, getTaskFormOptions } from "@/lib/queries/tasks";
-import { MONTH_NAMES } from "@/lib/constants";
+import { MONTH_NAMES, RECURRENCE_LABELS } from "@/lib/constants";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,10 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
   if (!task) notFound();
 
   const monthLabel = `${MONTH_NAMES[task.plan.month - 1]} ${task.plan.year}`;
+  const repeats = task.recurrence !== "NONE";
+  const repeatLabel = repeats
+    ? `${RECURRENCE_LABELS[task.recurrence]}${task.recurrenceEndsAt ? ` until ${formatDate(task.recurrenceEndsAt)}` : ""}`
+    : "No";
 
   return (
     <>
@@ -50,6 +54,8 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
             completion: task.completion,
             startDate: task.startDate,
             dueDate: task.dueDate,
+            recurrence: task.recurrence,
+            recurrenceEndsAt: task.recurrenceEndsAt,
           }}
           options={options}
         />
@@ -60,6 +66,11 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
         <PriorityBadge priority={task.priority} />
         <CategoryBadge category={task.category} />
         <span className="text-xs text-muted-foreground">Due {formatDate(task.dueDate)}</span>
+        {repeats && (
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <Repeat className="size-3" /> {RECURRENCE_LABELS[task.recurrence]}
+          </span>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
@@ -97,6 +108,7 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
               </Row>
               <Row label="Start date">{formatDate(task.startDate)}</Row>
               <Row label="Due date">{formatDate(task.dueDate)}</Row>
+              <Row label="Repeats">{repeatLabel}</Row>
               <Row label="Completed">{formatDate(task.completedAt)}</Row>
               <Row label="Plan">
                 <Link href={`/monthly-plans/${task.plan.id}`} className="hover:underline">

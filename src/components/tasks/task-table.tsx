@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   Paperclip,
   Pencil,
+  Repeat,
   Trash2,
   UserRoundCog,
 } from "lucide-react";
@@ -37,7 +38,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TaskFormDialog, taskToFormValues, type TaskFormValues } from "@/components/tasks/task-form-dialog";
 import { useQueryState } from "@/hooks/use-query-state";
-import { STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
+import { RECURRENCE_LABELS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import type { TaskFormOptions, TaskListItem } from "@/lib/queries/tasks";
 
@@ -154,6 +155,11 @@ export function TaskTable({
                       {task.title}
                     </Link>
                     <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                      {task.recurrence !== "NONE" && (
+                        <span className="inline-flex items-center gap-1" title={`Repeats: `}>
+                          <Repeat className="size-3" /> {RECURRENCE_LABELS[task.recurrence]}
+                        </span>
+                      )}
                       {task._count.subtasks > 0 && (
                         <span className="inline-flex items-center gap-1">
                           <CheckSquare className="size-3" /> {doneSubtasks}/{task._count.subtasks}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { NavPending } from "@/components/layout/nav-pending";
 
 export function MemberNav({ unseenFiles }: { unseenFiles: number }) {
   const pathname = usePathname();
@@ -26,6 +27,7 @@ export function MemberNav({ unseenFiles }: { unseenFiles: number }) {
             )}
           >
             {item.label}
+            <NavPending className="ml-1.5" />
             {item.badge > 0 && (
               <span className="ml-1.5 inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
                 {item.badge > 99 ? "99+" : item.badge}

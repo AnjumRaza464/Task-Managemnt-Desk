@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   experimental: {
     // File uploads (task attachments, shared files) go through server actions.
     serverActions: { bodySizeLimit: "6mb" },
+    // Keep visited dynamic pages in the client router cache briefly so switching
+    // back to a tab is instant. Mutations call router.refresh() / revalidatePath,
+    // which drop the cached entry, so fresh data still shows after a change.
+    staleTimes: { dynamic: 30 },
   },
 };
 

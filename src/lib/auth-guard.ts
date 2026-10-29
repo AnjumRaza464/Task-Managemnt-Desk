@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -23,8 +24,9 @@ export class UnauthorizedError extends Error {
 /**
  * Resolves the signed-in user from the session and re-validates against the
  * database (active flag + role) so changes take effect immediately.
+ * Memoized per request with React cache() so a layout and its page share one lookup.
  */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await auth();
   const id = session?.user?.id;
   if (!id) return null;
@@ -35,7 +37,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   });
   if (!user || !user.isActive) return null;
   return { id: user.id, name: user.name, email: user.email, role: user.role };
-}
+});
 
 export async function getCurrentManager(): Promise<CurrentManager | null> {
   const user = await getCurrentUser();

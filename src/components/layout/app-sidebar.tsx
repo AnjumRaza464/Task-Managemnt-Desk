@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/sidebar";
 import { APP_NAME } from "@/lib/constants";
 import { UserMenu } from "@/components/layout/user-menu";
+import { NavLinkIcon } from "@/components/layout/nav-pending";
 import type { CurrentManager } from "@/lib/auth-guard";
 
 const NAV = [
@@ -113,7 +114,7 @@ export function AppSidebar({
                       tooltip={item.title}
                       render={<Link href={item.href} />}
                     >
-                      <item.icon />
+                      <NavLinkIcon icon={item.icon} />
                       <span>{item.title}</span>
                     </SidebarMenuButton>
                     {item.href === "/notifications" && unreadCount > 0 && (

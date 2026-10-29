@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { requireManagerPage } from "@/lib/auth-guard";
-import { prisma } from "@/lib/prisma";
 import { getCategories } from "@/lib/queries/categories";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/page-header";
@@ -16,10 +15,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   const params = await searchParams;
   const tabs = ["profile", "security", "categories", "appearance"] as const;
   const initial = tabs.includes(params.tab as (typeof tabs)[number]) ? (params.tab as string) : "profile";
-  const [categories, prefs] = await Promise.all([
-    getCategories(),
-    prisma.user.findUnique({ where: { id: manager.id }, select: { emailNotifications: true } }),
-  ]);
+  const categories = await getCategories();
 
   return (
     <>
@@ -32,7 +28,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
         </TabsList>
         <TabsContent value="profile">
-          <ProfileForm user={{ ...manager, emailNotifications: prefs?.emailNotifications ?? true }} />
+          <ProfileForm user={manager} />
         </TabsContent>
         <TabsContent value="security">
           <PasswordForm />

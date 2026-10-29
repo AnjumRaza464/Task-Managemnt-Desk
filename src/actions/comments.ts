@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { requireManager } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
 import { logActivity, notifyManagers, notifyUsers } from "@/lib/activity";
-import { getAppUrl } from "@/lib/app-url";
 import { commentSchema } from "@/lib/validations/task";
 
 export async function addComment(input: unknown) {
@@ -36,9 +35,7 @@ export async function addComment(input: unknown) {
       taskId: task.id,
       excludeUserIds: [manager.id, task.assigneeId],
     });
-    // The assignee gets the comment by email too (unless they wrote it).
-    const appUrl = await getAppUrl();
-    const excerpt = values.content.length > 200 ? `${values.content.slice(0, 200)}…` : values.content;
+    // The assignee is told too (unless they wrote the comment).
     await notifyUsers({
       userIds: [task.assigneeId],
       type: "COMMENT_ADDED",
@@ -46,12 +43,6 @@ export async function addComment(input: unknown) {
       message: `${manager.name} commented on "${task.title}".`,
       taskId: task.id,
       excludeUserId: manager.id,
-      email: {
-        subject: `New comment on ${task.title}`,
-        heading: "New comment on your task",
-        lines: [`${manager.name} commented on "${task.title}":`, `"${excerpt}"`],
-        cta: { label: "Open task", url: `${appUrl}/tasks/${task.id}` },
-      },
     });
     revalidatePath(`/tasks/${task.id}`);
     revalidatePath(`/my-tasks/${task.id}`);

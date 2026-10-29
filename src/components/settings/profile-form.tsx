@@ -9,24 +9,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { RoleBadge } from "@/components/shared/badges";
 import type { CurrentManager } from "@/lib/auth-guard";
 
-export function ProfileForm({ user }: { user: CurrentManager & { emailNotifications: boolean } }) {
+export function ProfileForm({ user }: { user: CurrentManager }) {
   const router = useRouter();
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
-  const [emailNotifications, setEmailNotifications] = useState(user.emailNotifications);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [pending, startTransition] = useTransition();
-  const dirty = name !== user.name || email !== user.email || emailNotifications !== user.emailNotifications;
+  const dirty = name !== user.name || email !== user.email;
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
     setErrors({});
     startTransition(async () => {
-      const result = await updateProfile({ name, email, emailNotifications });
+      const result = await updateProfile({ name, email });
       if (!result.ok) {
         setErrors(result.fieldErrors ?? {});
         toast.error(result.error);
@@ -56,20 +54,7 @@ export function ProfileForm({ user }: { user: CurrentManager & { emailNotificati
             <Label htmlFor="profile-email">Email</Label>
             <Input id="profile-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             {errors.email?.[0] && <p className="text-xs text-destructive">{errors.email[0]}</p>}
-            <p className="text-xs text-muted-foreground">You sign in with this email, and reminders are sent to it.</p>
-          </div>
-          <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
-            <div className="space-y-0.5">
-              <Label htmlFor="profile-email-notifications">Email notifications</Label>
-              <p className="text-xs text-muted-foreground">
-                Task completions, comments on your tasks, reminders and shared files.
-              </p>
-            </div>
-            <Switch
-              id="profile-email-notifications"
-              checked={emailNotifications}
-              onCheckedChange={(checked) => setEmailNotifications(checked)}
-            />
+            <p className="text-xs text-muted-foreground">You sign in with this email.</p>
           </div>
           <Button type="submit" disabled={!dirty || pending}>
             {pending ? <Loader2 className="animate-spin" /> : <Save />} Save changes

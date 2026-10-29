@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { CheckCircle2 } from "lucide-react";
 import { LoginForm } from "@/components/auth/login-form";
 import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
 import { BrandLogo, BrandMark } from "@/components/shared/brand-logo";
@@ -14,7 +13,6 @@ export default async function LoginPage({
   const params = await searchParams;
   const callbackUrl =
     typeof params.callbackUrl === "string" ? params.callbackUrl : "/dashboard";
-  const passwordReset = params.reset === "1";
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
@@ -51,15 +49,6 @@ export default async function LoginPage({
               Sign in with your account to continue.
             </p>
           </div>
-          {passwordReset && (
-            <div
-              role="status"
-              className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300"
-            >
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-              <span>Your password has been updated. Sign in with your new password.</span>
-            </div>
-          )}
           <LoginForm callbackUrl={callbackUrl} />
         </div>
       </div>

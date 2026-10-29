@@ -4,12 +4,12 @@ import { authConfig } from "@/auth.config";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
+const PUBLIC_PATHS = ["/login"];
 const MEMBER_PREFIX = "/my-tasks";
 const MEMBER_PREFIXES = ["/my-tasks", "/my-files"];
 const isMemberPath = (pathname: string) => MEMBER_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
-/** Manager URLs that have a member-area twin (used by links in emails). */
+/** Manager URLs that have a member-area twin, so shared links still land somewhere useful. */
 function memberEquivalent(pathname: string): string {
   const task = pathname.match(/^\/tasks\/([^/]+)$/);
   if (task && task[1] !== "kanban") return `/my-tasks/${task[1]}`;

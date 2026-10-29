@@ -109,7 +109,6 @@ export const categorySchema = z.object({
 export const profileSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.email().trim().toLowerCase(),
-  emailNotifications: z.boolean().default(true),
 });
 
 export const passwordChangeSchema = z
@@ -123,18 +122,3 @@ export const passwordChangeSchema = z
     path: ["confirmPassword"],
   });
 
-/** "Forgot password" request; the identifier is whatever the user signs in with. */
-export const forgotPasswordSchema = z.object({
-  email: z.string().trim().toLowerCase().min(3, "Enter the email you sign in with").max(120),
-});
-
-export const resetPasswordSchema = z
-  .object({
-    token: z.string().min(20, "This reset link is invalid."),
-    password: z.string().min(8, "Password must be at least 8 characters").max(72),
-    confirmPassword: z.string(),
-  })
-  .refine((v) => v.password === v.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });

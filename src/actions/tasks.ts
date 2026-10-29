@@ -5,9 +5,7 @@ import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { requireManager } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
-import { logActivity, notifyManagers, notifyUsers, type NotificationEmail } from "@/lib/activity";
-import { getAppUrl } from "@/lib/app-url";
-import { PRIORITY_LABELS } from "@/lib/constants";
+import { logActivity, notifyManagers, notifyUsers } from "@/lib/activity";
 import { parseDateInput } from "@/lib/dates";
 import { resolvePlan, spawnNextOccurrence } from "@/lib/recurrence";
 import { normalizeProgress, progressForCompletionChange, progressForStatusChange } from "@/lib/task-progress";
@@ -18,7 +16,6 @@ import {
   taskStatusUpdateSchema,
 } from "@/lib/validations/task";
 import type { Prisma } from "@/generated/prisma/client";
-import type { Priority } from "@/generated/prisma/enums";
 
 type Tx = Prisma.TransactionClient;
 
@@ -35,33 +32,6 @@ async function assertActiveUser(tx: Tx, userId: string) {
   return user;
 }
 
-/** Email for the person a task was (re)assigned to. */
-function assignedEmail(
-  task: { id: string; title: string; dueDate: Date; priority: Priority },
-  by: string,
-  appUrl: string,
-): NotificationEmail {
-  return {
-    subject: `New task: ${task.title}`,
-    heading: "A task was assigned to you",
-    lines: [
-      `${by} assigned you "${task.title}".`,
-      `Due ${format(task.dueDate, "EEEE, MMMM d, yyyy")} · ${PRIORITY_LABELS[task.priority]} priority.`,
-    ],
-    cta: { label: "Open task", url: `${appUrl}/tasks/${task.id}` },
-  };
-}
-
-/** Email for managers when a task is completed. */
-function completedEmail(task: { id: string; title: string }, who: string, appUrl: string): NotificationEmail {
-  return {
-    subject: `Completed: ${task.title}`,
-    heading: "Task completed",
-    lines: [`${who} marked "${task.title}" as completed.`],
-    cta: { label: "View task", url: `${appUrl}/tasks/${task.id}` },
-  };
-}
-
 export async function createTask(input: unknown) {
   return runAction(async () => {
     const manager = await requireManager();
@@ -69,7 +39,6 @@ export async function createTask(input: unknown) {
     const dueDate = parseDateInput(values.dueDate);
     const startDate = values.startDate ? parseDateInput(values.startDate) : null;
     const recurrenceEndsAt = values.recurrence !== "NONE" && values.recurrenceEndsAt ? parseDateInput(values.recurrenceEndsAt) : null;
-    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const assignee = await assertActiveUser(tx, values.assigneeId);
@@ -126,7 +95,6 @@ export async function createTask(input: unknown) {
           message: `"${created.title}" is due ${format(dueDate, "MMM d")}.`,
           taskId: created.id,
           excludeUserId: manager.id,
-          email: assignedEmail(created, manager.name, appUrl),
         },
         tx,
       );
@@ -145,7 +113,6 @@ export async function updateTask(id: string, input: unknown) {
     const dueDate = parseDateInput(values.dueDate);
     const startDate = values.startDate ? parseDateInput(values.startDate) : null;
     const recurrenceEndsAt = values.recurrence !== "NONE" && values.recurrenceEndsAt ? parseDateInput(values.recurrenceEndsAt) : null;
-    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: { assignee: true } });
@@ -203,7 +170,6 @@ export async function updateTask(id: string, input: unknown) {
             message: `"${updated.title}" is now assigned to you · due ${format(updated.dueDate, "MMM d")}.`,
             taskId: id,
             excludeUserId: manager.id,
-            email: assignedEmail(updated, manager.name, appUrl),
           },
           tx,
         );
@@ -217,7 +183,6 @@ export async function updateTask(id: string, input: unknown) {
             message: `"${updated.title}" (${assignee.name}) was marked completed.`,
             taskId: id,
             excludeUserId: manager.id,
-            email: completedEmail(updated, manager.name, appUrl),
           },
           tx,
         );
@@ -235,7 +200,6 @@ export async function updateTaskStatus(input: unknown) {
   return runAction(async () => {
     const manager = await requireManager();
     const { id, status } = taskStatusUpdateSchema.parse(input);
-    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: { assignee: { select: { name: true } } } });
@@ -271,7 +235,6 @@ export async function updateTaskStatus(input: unknown) {
               message: `"${updated.title}" (${existing.assignee.name}) was marked completed.`,
               taskId: id,
               excludeUserId: manager.id,
-              email: completedEmail(updated, manager.name, appUrl),
             },
             tx,
           );
@@ -290,7 +253,6 @@ export async function updateTaskCompletion(input: unknown) {
   return runAction(async () => {
     const manager = await requireManager();
     const { id, completion } = taskCompletionSchema.parse(input);
-    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: { assignee: { select: { name: true } } } });
@@ -323,7 +285,6 @@ export async function updateTaskCompletion(input: unknown) {
             message: `"${updated.title}" (${existing.assignee.name}) reached 100%.`,
             taskId: id,
             excludeUserId: manager.id,
-            email: completedEmail(updated, manager.name, appUrl),
           },
           tx,
         );
@@ -341,7 +302,6 @@ export async function reassignTask(input: unknown) {
   return runAction(async () => {
     const manager = await requireManager();
     const { id, assigneeId } = reassignSchema.parse(input);
-    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: { assignee: true } });
@@ -379,7 +339,6 @@ export async function reassignTask(input: unknown) {
           message: `"${updated.title}" is now assigned to you · due ${format(updated.dueDate, "MMM d")}.`,
           taskId: id,
           excludeUserId: manager.id,
-          email: assignedEmail(updated, manager.name, appUrl),
         },
         tx,
       );

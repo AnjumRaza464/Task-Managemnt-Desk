@@ -2,7 +2,6 @@ import "server-only";
 import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { notifyManagers, notifyUsers } from "@/lib/activity";
-import { getAppUrl } from "@/lib/app-url";
 import { today, todayRange } from "@/lib/dates";
 
 let lastRun = 0;
@@ -10,9 +9,9 @@ const MIN_INTERVAL_MS = 60_000;
 
 /**
  * Marks PENDING / IN_PROGRESS tasks whose due date has passed as OVERDUE and
- * raises "overdue" and "due today" notifications (deduplicated). Managers get
- * them in the app; the assignee gets them in the app and by email.
- * Cheap enough to call from page loads; throttled to once a minute per server.
+ * raises "overdue" and "due today" notifications (deduplicated) for managers
+ * and for the assignee. Cheap enough to call from page loads; throttled to
+ * once a minute per server.
  */
 export async function syncOverdueTasks(force = false) {
   const now = Date.now();
@@ -25,13 +24,6 @@ export async function syncOverdueTasks(force = false) {
     where: { status: { in: ["PENDING", "IN_PROGRESS"] }, dueDate: { lt: today() } },
     select,
   });
-  const dueToday = await prisma.task.findMany({
-    where: { status: { in: ["PENDING", "IN_PROGRESS"] }, dueDate: todayRange() },
-    select,
-  });
-  if (overdue.length === 0 && dueToday.length === 0) return;
-
-  const appUrl = await getAppUrl();
 
   if (overdue.length > 0) {
     await prisma.task.updateMany({
@@ -54,19 +46,14 @@ export async function syncOverdueTasks(force = false) {
         message: `"${task.title}" was due ${format(task.dueDate, "MMM d")} and is still open.`,
         taskId: task.id,
         dedupeKey: `OVERDUE:${task.id}`,
-        email: {
-          subject: `Overdue: ${task.title}`,
-          heading: "A task is overdue",
-          lines: [
-            `"${task.title}" was due on ${format(task.dueDate, "EEEE, MMMM d")} and is still open.`,
-            "Please update its status or progress, or let your manager know if it is blocked.",
-          ],
-          cta: { label: "Open task", url: `${appUrl}/tasks/${task.id}` },
-        },
       });
     }
   }
 
+  const dueToday = await prisma.task.findMany({
+    where: { status: { in: ["PENDING", "IN_PROGRESS"] }, dueDate: todayRange() },
+    select,
+  });
   const dayKey = format(new Date(), "yyyy-MM-dd");
   for (const task of dueToday) {
     await notifyManagers({
@@ -84,12 +71,6 @@ export async function syncOverdueTasks(force = false) {
       message: `"${task.title}" is due today.`,
       taskId: task.id,
       dedupeKey: `DUE_TODAY:${task.id}:${dayKey}`,
-      email: {
-        subject: `Due today: ${task.title}`,
-        heading: "A task is due today",
-        lines: [`"${task.title}" is due today. Make sure its status and progress are up to date before the day ends.`],
-        cta: { label: "Open task", url: `${appUrl}/tasks/${task.id}` },
-      },
     });
   }
 }

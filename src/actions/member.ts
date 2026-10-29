@@ -5,8 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, UnauthorizedError } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
-import { logActivity, notifyManagers, type NotificationEmail } from "@/lib/activity";
-import { getAppUrl } from "@/lib/app-url";
+import { logActivity, notifyManagers } from "@/lib/activity";
 import { spawnNextOccurrence } from "@/lib/recurrence";
 import { progressForCompletionChange, progressForStatusChange } from "@/lib/task-progress";
 import type { Prisma } from "@/generated/prisma/client";
@@ -53,20 +52,10 @@ async function loadOwnTask(tx: Prisma.TransactionClient, id: string, userId: str
   return task;
 }
 
-function completedEmail(task: { id: string; title: string }, who: string, appUrl: string): NotificationEmail {
-  return {
-    subject: `Completed: ${task.title}`,
-    heading: "Task completed",
-    lines: [`${who} marked "${task.title}" as completed.`],
-    cta: { label: "View task", url: `${appUrl}/tasks/${task.id}` },
-  };
-}
-
 export async function updateMyTaskStatus(input: unknown) {
   return runAction(async () => {
     const user = await requireUser();
     const { id, status } = statusSchema.parse(input);
-    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await loadOwnTask(tx, id, user.id);
@@ -99,7 +88,6 @@ export async function updateMyTaskStatus(input: unknown) {
               message: `${user.name} marked "${updated.title}" as completed.`,
               taskId: id,
               excludeUserId: user.id,
-              email: completedEmail(updated, user.name, appUrl),
             },
             tx,
           );
@@ -118,7 +106,6 @@ export async function updateMyTaskCompletion(input: unknown) {
   return runAction(async () => {
     const user = await requireUser();
     const { id, completion } = completionSchema.parse(input);
-    const appUrl = await getAppUrl();
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await loadOwnTask(tx, id, user.id);
@@ -150,7 +137,6 @@ export async function updateMyTaskCompletion(input: unknown) {
             message: `${user.name} brought "${updated.title}" to 100%.`,
             taskId: id,
             excludeUserId: user.id,
-            email: completedEmail(updated, user.name, appUrl),
           },
           tx,
         );

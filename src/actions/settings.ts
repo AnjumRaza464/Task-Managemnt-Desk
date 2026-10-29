@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser, requireManager, UnauthorizedError } from "@/lib/auth-guard";
+import { requireManager } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
 import { logActivity } from "@/lib/activity";
 import { passwordChangeSchema, profileSchema } from "@/lib/validations/task";
@@ -14,7 +14,7 @@ export async function updateProfile(input: unknown) {
     const values = profileSchema.parse(input);
     const user = await prisma.user.update({
       where: { id: manager.id },
-      data: { name: values.name, email: values.email, emailNotifications: values.emailNotifications },
+      data: { name: values.name, email: values.email },
     });
     await logActivity({
       actorId: manager.id,
@@ -24,18 +24,7 @@ export async function updateProfile(input: unknown) {
     });
     revalidatePath("/settings");
     revalidatePath("/", "layout");
-    return { name: user.name, email: user.email, emailNotifications: user.emailNotifications };
-  });
-}
-
-/** Turns email notifications on or off for the signed-in user (any role). */
-export async function updateEmailPreference(enabled: boolean) {
-  return runAction(async () => {
-    const user = await getCurrentUser();
-    if (!user) throw new UnauthorizedError("Please sign in again.");
-    await prisma.user.update({ where: { id: user.id }, data: { emailNotifications: Boolean(enabled) } });
-    revalidatePath("/", "layout");
-    return { emailNotifications: Boolean(enabled) };
+    return { name: user.name, email: user.email };
   });
 }
 

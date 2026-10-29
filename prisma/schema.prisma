@@ -67,10 +67,6 @@ model User {
    * When the user last opened the shared team channel.
    */
   teamChatReadAt DateTime?
-  /**
-   * Receive email for assignments, reminders, comments and shared files.
-   */
-  emailNotifications Boolean @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -86,7 +82,6 @@ model User {
   workSessions     WorkSession[]
   sharedFiles      SharedFile[]          @relation("SharedFileOwner")
   receivedFiles    SharedFileRecipient[]
-  passwordResetTokens PasswordResetToken[]
 
   @@index([role, isActive])
 }
@@ -338,19 +333,3 @@ model SharedFileRecipient {
   @@index([userId])
 }
 
-/**
- * One-time token for "forgot password" links. Only the SHA-256 hash of the
- * token is stored; the raw token lives in the emailed link.
- */
-model PasswordResetToken {
-  id        String    @id @default(cuid())
-  userId    String
-  tokenHash String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-}

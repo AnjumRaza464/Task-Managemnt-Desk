@@ -3,9 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Circle, Download, FolderKanban, Paperclip } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
-import { getTaskById } from "@/lib/queries/tasks";
+import { getDependencyCandidates, getTaskById } from "@/lib/queries/tasks";
 import { getAssignableUsers } from "@/lib/queries/users";
 import { CommentSection } from "@/components/tasks/comment-section";
+import { DependencyCard } from "@/components/tasks/dependency-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
@@ -22,6 +23,7 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
   const [task, users] = await Promise.all([getTaskById(id), getAssignableUsers()]);
   // Members can only open tasks assigned to them.
   if (!task || !task.assignees.some((a) => a.userId === user.id)) notFound();
+  const candidates = task.projectId ? await getDependencyCandidates(task) : [];
 
   const doneSubtasks = task.subtasks.filter((s) => s.isCompleted).length;
   const repeatLabel =
@@ -141,6 +143,17 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
               <MyTaskControls task={{ id: task.id, status: task.status, completion: task.completion }} />
             </CardContent>
           </Card>
+
+          {(task.blockedBy.length > 0 || task.blocks.length > 0 || task.projectId) && (
+            <DependencyCard
+              taskId={task.id}
+              blockedBy={task.blockedBy.map((d) => d.blocker)}
+              blocks={task.blocks.map((d) => d.blocked)}
+              candidates={candidates}
+              canEdit={Boolean(task.projectId)}
+              taskHref="/my-tasks"
+            />
+          )}
 
           <Card>
             <CardHeader>

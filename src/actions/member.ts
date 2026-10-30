@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, UnauthorizedError } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
 import { logActivity, notifyManagers } from "@/lib/activity";
-import { spawnNextOccurrence } from "@/lib/recurrence";
+import { assertNotBlocked, onTaskCompleted } from "@/lib/task-events";
 import { progressForCompletionChange, progressForStatusChange } from "@/lib/task-progress";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -61,6 +61,7 @@ export async function updateMyTaskStatus(input: unknown) {
     const task = await prisma.$transaction(async (tx) => {
       const existing = await loadOwnTask(tx, id, user.id);
       const progress = progressForStatusChange(existing, status);
+      if (progress.status === "COMPLETED" && existing.status !== "COMPLETED") await assertNotBlocked(tx, id);
       const updated = await tx.task.update({
         where: { id },
         data: {
@@ -92,7 +93,7 @@ export async function updateMyTaskStatus(input: unknown) {
             },
             tx,
           );
-          await spawnNextOccurrence(tx, updated, user.id);
+          await onTaskCompleted(tx, updated, user.id);
         }
       }
       return updated;
@@ -111,6 +112,7 @@ export async function updateMyTaskCompletion(input: unknown) {
     const task = await prisma.$transaction(async (tx) => {
       const existing = await loadOwnTask(tx, id, user.id);
       const progress = progressForCompletionChange(existing, completion);
+      if (progress.status === "COMPLETED" && existing.status !== "COMPLETED") await assertNotBlocked(tx, id);
       const updated = await tx.task.update({
         where: { id },
         data: {
@@ -141,7 +143,7 @@ export async function updateMyTaskCompletion(input: unknown) {
           },
           tx,
         );
-        await spawnNextOccurrence(tx, updated, user.id);
+        await onTaskCompleted(tx, updated, user.id);
       }
       return updated;
     });

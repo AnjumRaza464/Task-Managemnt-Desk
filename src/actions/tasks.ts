@@ -10,7 +10,8 @@ import { parseDateInput } from "@/lib/dates";
 import { getProjectAccess, requireTaskAccess, requireUser } from "@/lib/permissions";
 import { ensureProjectMembers, resolveProjectPlacement, revalidateProjectViews } from "@/lib/project-members";
 import { revalidateTaskViews } from "@/lib/task-views";
-import { resolvePlan, spawnNextOccurrence } from "@/lib/recurrence";
+import { resolvePlan } from "@/lib/recurrence";
+import { assertNotBlocked, onTaskCompleted } from "@/lib/task-events";
 import { normalizeProgress, progressForCompletionChange, progressForStatusChange } from "@/lib/task-progress";
 import {
   assigneesSchema,
@@ -172,6 +173,7 @@ export async function updateTask(id: string, input: unknown) {
       const primary = assignees[0];
       const plan = await resolvePlan(tx, primary.id, dueDate);
       const progress = normalizeProgress(values.status, values.completion, dueDate, existing.status);
+      if (progress.status === "COMPLETED" && existing.status !== "COMPLETED") await assertNotBlocked(tx, id);
       const where = await placement(tx, values);
 
       const updated = await tx.task.update({
@@ -235,7 +237,7 @@ export async function updateTask(id: string, input: unknown) {
           },
           tx,
         );
-        await spawnNextOccurrence(tx, updated, manager.id);
+        await onTaskCompleted(tx, updated, manager.id);
       }
       return { updated, previousProjectId: existing.projectId };
     });
@@ -256,6 +258,7 @@ export async function updateTaskStatus(input: unknown) {
       const existing = await tx.task.findUnique({ where: { id }, include: assigneeInclude });
       if (!existing) throw new ActionError("Task not found.");
       const progress = progressForStatusChange(existing, status);
+      if (progress.status === "COMPLETED" && existing.status !== "COMPLETED") await assertNotBlocked(tx, id);
       const lastPosition = await tx.task.aggregate({ _max: { position: true }, where: { status: progress.status } });
       const updated = await tx.task.update({
         where: { id },
@@ -289,7 +292,7 @@ export async function updateTaskStatus(input: unknown) {
             },
             tx,
           );
-          await spawnNextOccurrence(tx, updated, manager.id);
+          await onTaskCompleted(tx, updated, manager.id);
         }
       }
       return updated;
@@ -310,6 +313,7 @@ export async function updateTaskCompletion(input: unknown) {
       const existing = await tx.task.findUnique({ where: { id }, include: assigneeInclude });
       if (!existing) throw new ActionError("Task not found.");
       const progress = progressForCompletionChange(existing, completion);
+      if (progress.status === "COMPLETED" && existing.status !== "COMPLETED") await assertNotBlocked(tx, id);
       const updated = await tx.task.update({
         where: { id },
         data: {
@@ -340,7 +344,7 @@ export async function updateTaskCompletion(input: unknown) {
           },
           tx,
         );
-        await spawnNextOccurrence(tx, updated, manager.id);
+        await onTaskCompleted(tx, updated, manager.id);
       }
       return updated;
     });

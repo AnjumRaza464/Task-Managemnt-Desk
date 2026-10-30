@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, KanbanSquare, ListTodo, MessageSquare, Users, Activity as ActivityIcon } from "lucide-react";
+import { ArrowLeft, CalendarDays, Flag, GanttChart, KanbanSquare, ListTodo, MessageSquare, Users, Activity as ActivityIcon } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AssigneeAvatars } from "@/components/shared/assignee-avatars";
@@ -8,6 +8,8 @@ import { ProjectActivity } from "@/components/projects/project-activity";
 import { ProjectBoard } from "@/components/projects/project-board";
 import { ProjectHeaderActions } from "@/components/projects/project-header-actions";
 import { ProjectMembers } from "@/components/projects/project-members";
+import { ProjectMilestones } from "@/components/projects/project-milestones";
+import { ProjectTimeline } from "@/components/projects/project-timeline";
 import { ProjectStatusBadge } from "@/components/projects/project-status-badge";
 import { CommentSection } from "@/components/tasks/comment-section";
 import { TaskTable } from "@/components/tasks/task-table";
@@ -16,11 +18,13 @@ import type { ProjectDetail } from "@/lib/queries/projects";
 import type { TaskFormOptions } from "@/lib/queries/tasks";
 import { cn, formatDate, toDateInputValue } from "@/lib/utils";
 
-export type ProjectTab = "board" | "tasks" | "discussion" | "members" | "activity";
+export type ProjectTab = "board" | "tasks" | "timeline" | "milestones" | "discussion" | "members" | "activity";
 
 const TABS: { key: ProjectTab; label: string; icon: LucideIcon }[] = [
   { key: "board", label: "Board", icon: KanbanSquare },
   { key: "tasks", label: "Tasks", icon: ListTodo },
+  { key: "timeline", label: "Timeline", icon: GanttChart },
+  { key: "milestones", label: "Milestones", icon: Flag },
   { key: "discussion", label: "Discussion", icon: MessageSquare },
   { key: "members", label: "Members", icon: Users },
   { key: "activity", label: "Activity", icon: ActivityIcon },
@@ -133,6 +137,11 @@ export function ProjectView({
             >
               <t.icon className="size-4" /> {t.label}
               {t.key === "members" && <span className="text-xs text-muted-foreground">{project.members.length}</span>}
+              {t.key === "milestones" && project.milestones.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {project.milestones.filter((m) => m.completedAt).length}/{project.milestones.length}
+                </span>
+              )}
               {t.key === "discussion" && project.comments.length > 0 && (
                 <span className="text-xs text-muted-foreground">{project.comments.length}</span>
               )}
@@ -162,6 +171,18 @@ export function ProjectView({
           emptyTitle="No tasks in this project"
           emptyDescription="Add a task from the board or the New task button."
         />
+      )}
+      {tab === "timeline" && (
+        <ProjectTimeline
+          project={{ startDate: project.startDate, dueDate: project.dueDate, color: project.color }}
+          tasks={project.tasks}
+          milestones={project.milestones}
+          lists={project.lists}
+          taskHref={taskHref}
+        />
+      )}
+      {tab === "milestones" && (
+        <ProjectMilestones projectId={project.id} milestones={project.milestones} tasks={project.tasks} canManage={access.canManage} taskHref={taskHref} />
       )}
       {tab === "discussion" && (
         <CommentSection

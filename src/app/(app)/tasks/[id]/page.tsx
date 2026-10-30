@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarRange, FolderKanban, Repeat } from "lucide-react";
 import { requireManagerPage } from "@/lib/auth-guard";
 import { syncOverdueTasks } from "@/lib/overdue";
-import { getTaskById, getTaskFormOptions } from "@/lib/queries/tasks";
+import { getDependencyCandidates, getTaskById, getTaskFormOptions } from "@/lib/queries/tasks";
 import { MONTH_NAMES, RECURRENCE_LABELS } from "@/lib/constants";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ActivityTimeline } from "@/components/tasks/activity-timeline";
 import { AttachmentList } from "@/components/tasks/attachment-list";
 import { CommentSection } from "@/components/tasks/comment-section";
+import { DependencyCard } from "@/components/tasks/dependency-card";
 import { SubtaskList } from "@/components/tasks/subtask-list";
 import { TaskDetailActions } from "@/components/tasks/task-detail-actions";
 import { TaskProgressCard } from "@/components/tasks/task-progress-card";
@@ -27,6 +28,7 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
   const { id } = await params;
   const [task, options] = await Promise.all([getTaskById(id), getTaskFormOptions(manager)]);
   if (!task) notFound();
+  const candidates = await getDependencyCandidates(task);
 
   const monthLabel = `${MONTH_NAMES[task.plan.month - 1]} ${task.plan.year}`;
   const repeats = task.recurrence !== "NONE";
@@ -161,6 +163,15 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
               <Row label="Updated">{formatDateTime(task.updatedAt)}</Row>
             </CardContent>
           </Card>
+
+          <DependencyCard
+            taskId={task.id}
+            blockedBy={task.blockedBy.map((d) => d.blocker)}
+            blocks={task.blocks.map((d) => d.blocked)}
+            candidates={candidates}
+            canEdit
+            taskHref="/tasks"
+          />
 
           <AttachmentList taskId={task.id} attachments={task.attachments} />
         </div>

@@ -186,6 +186,19 @@ export async function getTaskById(id: string) {
 
 export type TaskDetail = NonNullable<Awaited<ReturnType<typeof getTaskById>>>;
 
+/** Tasks this one could depend on: the rest of its project, or (outside projects) recent open tasks. */
+export async function getDependencyCandidates(task: { id: string; projectId: string | null }) {
+  return prisma.task.findMany({
+    where: {
+      id: { not: task.id },
+      ...(task.projectId ? { projectId: task.projectId } : { status: { in: ["PENDING", "IN_PROGRESS", "OVERDUE"] } }),
+    },
+    orderBy: [{ dueDate: "asc" }],
+    take: 200,
+    select: { id: true, title: true, status: true },
+  });
+}
+
 /**
  * Users, categories and projects for the task form. Managers get everything;
  * a member only gets the projects they belong to (users are still listed so

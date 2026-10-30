@@ -31,7 +31,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { APP_NAME } from "@/lib/constants";
-import { BrandMark } from "@/components/shared/brand-logo";
+import { BrandLogo, BrandMark } from "@/components/shared/brand-logo";
 import { UserMenu } from "@/components/layout/user-menu";
 import { NavLinkIcon } from "@/components/layout/nav-pending";
 import type { CurrentManager } from "@/lib/auth-guard";
@@ -90,13 +90,10 @@ export function AppSidebar({
               render={<Link href="/dashboard" />}
               className="data-[state=open]:bg-sidebar-accent"
             >
-              <BrandMark />
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{APP_NAME}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  Task management
-                </span>
-              </div>
+              {/* Wordmark when expanded, square mark when the sidebar is collapsed to icons. */}
+              <BrandMark className="hidden group-data-[collapsible=icon]:block" />
+              <BrandLogo className="h-9 group-data-[collapsible=icon]:hidden" />
+              <span className="sr-only">{APP_NAME}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

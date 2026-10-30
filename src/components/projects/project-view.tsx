@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, KanbanSquare, ListTodo, Users, Activity as ActivityIcon } from "lucide-react";
+import { ArrowLeft, CalendarDays, KanbanSquare, ListTodo, MessageSquare, Users, Activity as ActivityIcon } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AssigneeAvatars } from "@/components/shared/assignee-avatars";
@@ -9,17 +9,19 @@ import { ProjectBoard } from "@/components/projects/project-board";
 import { ProjectHeaderActions } from "@/components/projects/project-header-actions";
 import { ProjectMembers } from "@/components/projects/project-members";
 import { ProjectStatusBadge } from "@/components/projects/project-status-badge";
+import { CommentSection } from "@/components/tasks/comment-section";
 import { TaskTable } from "@/components/tasks/task-table";
 import type { CurrentUser } from "@/lib/auth-guard";
 import type { ProjectDetail } from "@/lib/queries/projects";
 import type { TaskFormOptions } from "@/lib/queries/tasks";
 import { cn, formatDate, toDateInputValue } from "@/lib/utils";
 
-export type ProjectTab = "board" | "tasks" | "members" | "activity";
+export type ProjectTab = "board" | "tasks" | "discussion" | "members" | "activity";
 
 const TABS: { key: ProjectTab; label: string; icon: LucideIcon }[] = [
   { key: "board", label: "Board", icon: KanbanSquare },
   { key: "tasks", label: "Tasks", icon: ListTodo },
+  { key: "discussion", label: "Discussion", icon: MessageSquare },
   { key: "members", label: "Members", icon: Users },
   { key: "activity", label: "Activity", icon: ActivityIcon },
 ];
@@ -131,6 +133,9 @@ export function ProjectView({
             >
               <t.icon className="size-4" /> {t.label}
               {t.key === "members" && <span className="text-xs text-muted-foreground">{project.members.length}</span>}
+              {t.key === "discussion" && project.comments.length > 0 && (
+                <span className="text-xs text-muted-foreground">{project.comments.length}</span>
+              )}
             </Link>
           );
         })}
@@ -156,6 +161,18 @@ export function ProjectView({
           canManage={access.canManage}
           emptyTitle="No tasks in this project"
           emptyDescription="Add a task from the board or the New task button."
+        />
+      )}
+      {tab === "discussion" && (
+        <CommentSection
+          target={{ projectId: project.id }}
+          comments={project.comments}
+          currentUserId={user.id}
+          users={users}
+          canComment={access.canComment}
+          canModerate={access.canManage}
+          title="Project discussion"
+          description="Announcements, questions and decisions for the whole project. Every member is notified of new posts; use @ to call someone in."
         />
       )}
       {tab === "members" && (

@@ -163,7 +163,18 @@ export async function getTaskById(id: string) {
       blockedBy: { select: { blocker: { select: { id: true, title: true, status: true, dueDate: true } } } },
       blocks: { select: { blocked: { select: { id: true, title: true, status: true, dueDate: true } } } },
       subtasks: { orderBy: { position: "asc" } },
-      comments: { orderBy: { createdAt: "desc" }, include: { author: { select: { id: true, name: true } } } },
+      comments: {
+        where: { parentId: null },
+        orderBy: { createdAt: "desc" },
+        include: {
+          author: { select: { id: true, name: true } },
+          mentions: { select: { userId: true } },
+          replies: {
+            orderBy: { createdAt: "asc" },
+            include: { author: { select: { id: true, name: true } }, mentions: { select: { userId: true } } },
+          },
+        },
+      },
       attachments: {
         orderBy: { createdAt: "desc" },
         select: { id: true, fileName: true, mimeType: true, size: true, createdAt: true, uploadedBy: { select: { name: true } } },

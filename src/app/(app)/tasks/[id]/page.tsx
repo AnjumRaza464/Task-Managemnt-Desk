@@ -96,7 +96,7 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
           </Card>
 
           <SubtaskList taskId={task.id} subtasks={task.subtasks} />
-          <CommentSection taskId={task.id} comments={task.comments} currentUserId={manager.id} />
+          <CommentSection target={{ taskId: task.id }} comments={task.comments} currentUserId={manager.id} users={options.users} canModerate />
           <ActivityTimeline activity={task.activity} />
         </div>
 

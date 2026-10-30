@@ -106,10 +106,15 @@ export const subtaskUpdateSchema = z.object({
   isCompleted: z.boolean().optional(),
 });
 
-export const commentSchema = z.object({
-  taskId: z.string().min(1),
-  content: z.string().trim().min(1, "Comment cannot be empty").max(2000),
-});
+export const commentSchema = z
+  .object({
+    taskId: z.string().min(1).optional(),
+    projectId: z.string().min(1).optional(),
+    parentId: z.string().min(1).optional(),
+    content: z.string().trim().min(1, "Comment cannot be empty").max(2000),
+    mentionIds: z.array(z.string().min(1)).max(25).default([]),
+  })
+  .refine((v) => Boolean(v.taskId) !== Boolean(v.projectId), { message: "A comment belongs to a task or a project", path: ["taskId"] });
 
 export const planSchema = z.object({
   id: z.string().min(1),

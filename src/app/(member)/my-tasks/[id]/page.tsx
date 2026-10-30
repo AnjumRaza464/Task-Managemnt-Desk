@@ -4,20 +4,22 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Circle, Download, FolderKanban, Paperclip } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { getTaskById } from "@/lib/queries/tasks";
+import { getAssignableUsers } from "@/lib/queries/users";
+import { CommentSection } from "@/components/tasks/comment-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { PageHeader } from "@/components/shared/page-header";
 import { MyTaskControls } from "@/components/member/my-task-controls";
 import { MONTH_NAMES, RECURRENCE_LABELS } from "@/lib/constants";
-import { cn, formatBytes, formatDate, formatDateTime } from "@/lib/utils";
+import { cn, formatBytes, formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Task" };
 
 export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[id]">) {
   const user = await requireMemberPage();
   const { id } = await params;
-  const task = await getTaskById(id);
+  const [task, users] = await Promise.all([getTaskById(id), getAssignableUsers()]);
   // Members can only open tasks assigned to them.
   if (!task || !task.assignees.some((a) => a.userId === user.id)) notFound();
 
@@ -83,27 +85,13 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Comments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {task.comments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No comments yet.</p>
-              ) : (
-                <ul className="space-y-4">
-                  {task.comments.map((c) => (
-                    <li key={c.id} className="space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">{c.author.name}</span> · {formatDateTime(c.createdAt)}
-                      </p>
-                      <p className="whitespace-pre-wrap text-sm">{c.content}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+          <CommentSection
+            target={{ taskId: task.id }}
+            comments={task.comments}
+            currentUserId={user.id}
+            users={users}
+            description="Questions, updates and feedback stay with the task. Use @ to mention someone."
+          />
         </div>
 
         <div className="space-y-6">

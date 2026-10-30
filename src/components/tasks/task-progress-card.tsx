@@ -4,10 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { reassignTask, updateTaskCompletion, updateTaskStatus } from "@/actions/tasks";
+import { setTaskAssignees, updateTaskCompletion, updateTaskStatus } from "@/actions/tasks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/shared/select-field";
+import { UserMultiSelect } from "@/components/shared/user-multi-select";
 import { STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { TaskFormOptions } from "@/lib/queries/tasks";
@@ -17,7 +18,7 @@ export function TaskProgressCard({
   task,
   options,
 }: {
-  task: { id: string; status: TaskStatus; completion: number; assigneeId: string };
+  task: { id: string; status: TaskStatus; completion: number; assigneeIds: string[] };
   options: TaskFormOptions;
 }) {
   const router = useRouter();
@@ -55,15 +56,24 @@ export function TaskProgressCard({
     });
   }
 
-  function reassign(assigneeId: string) {
-    if (!assigneeId || assigneeId === task.assigneeId) return;
+  const [assigneeIds, setAssigneeIds] = useState(task.assigneeIds);
+  const [prevAssignees, setPrevAssignees] = useState(task.assigneeIds);
+  if (task.assigneeIds !== prevAssignees) {
+    setPrevAssignees(task.assigneeIds);
+    setAssigneeIds(task.assigneeIds);
+  }
+
+  function reassign(ids: string[]) {
+    setAssigneeIds(ids);
+    if (ids.length === 0) return;
     startTransition(async () => {
-      const result = await reassignTask({ id: task.id, assigneeId });
+      const result = await setTaskAssignees({ id: task.id, assigneeIds: ids });
       if (!result.ok) {
+        setAssigneeIds(task.assigneeIds);
         toast.error(result.error);
         return;
       }
-      toast.success("Task reassigned");
+      toast.success("Assignees updated");
       router.refresh();
     });
   }
@@ -120,14 +130,8 @@ export function TaskProgressCard({
 
         <div className="space-y-1.5">
           <Label htmlFor="task-assignee">Assigned to</Label>
-          <SelectField
-            id="task-assignee"
-            value={task.assigneeId}
-            onChange={reassign}
-            disabled={pending}
-            options={options.users.map((u) => ({ value: u.id, label: u.name }))}
-          />
-          <p className="text-xs text-muted-foreground">Reassigning moves the task into that user&apos;s plan for the same month.</p>
+          <UserMultiSelect id="task-assignee" value={assigneeIds} onChange={reassign} users={options.users} disabled={pending} />
+          {assigneeIds.length === 0 && <p className="text-xs text-destructive">A task needs at least one assignee.</p>}
         </div>
       </CardContent>
     </Card>

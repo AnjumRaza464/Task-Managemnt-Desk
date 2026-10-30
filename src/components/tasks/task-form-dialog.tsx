@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/shared/select-field";
+import { UserMultiSelect } from "@/components/shared/user-multi-select";
 import {
   PRIORITIES,
   PRIORITY_LABELS,
@@ -34,7 +35,7 @@ export type TaskFormValues = {
   id?: string;
   title: string;
   description: string;
-  assigneeId: string;
+  assigneeIds: string[];
   categoryId: string;
   priority: Priority;
   status: TaskStatus;
@@ -49,7 +50,7 @@ export function emptyTaskValues(defaults: Partial<TaskFormValues> = {}): TaskFor
   return {
     title: "",
     description: "",
-    assigneeId: "",
+    assigneeIds: [],
     categoryId: "",
     priority: "MEDIUM",
     status: "PENDING",
@@ -144,16 +145,16 @@ export function TaskFormDialog({
                 placeholder="What needs to be done?"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="assignee">Assign to</Label>
-              <SelectField
-                id="assignee"
-                value={values.assigneeId}
-                onChange={(v) => set("assigneeId", v)}
-                placeholder="Select user"
-                options={options.users.map((u) => ({ value: u.id, label: u.name }))}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="assignees">Assign to</Label>
+              <UserMultiSelect
+                id="assignees"
+                value={values.assigneeIds}
+                onChange={(ids) => set("assigneeIds", ids)}
+                users={options.users}
+                placeholder="Select one or more people"
               />
-              {err("assigneeId") && <p className="text-xs text-destructive">{err("assigneeId")}</p>}
+              {err("assigneeIds") && <p className="text-xs text-destructive">{err("assigneeIds")}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="category">Category</Label>
@@ -268,6 +269,7 @@ export function taskToFormValues(task: {
   title: string;
   description: string | null;
   assigneeId: string;
+  assignees?: { userId: string }[];
   categoryId: string | null;
   priority: Priority;
   status: TaskStatus;
@@ -281,7 +283,7 @@ export function taskToFormValues(task: {
     id: task.id,
     title: task.title,
     description: task.description ?? "",
-    assigneeId: task.assigneeId,
+    assigneeIds: task.assignees?.length ? task.assignees.map((a) => a.userId) : [task.assigneeId],
     categoryId: task.categoryId ?? "",
     priority: task.priority,
     status: task.status,

@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, CheckSquare, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteTask, updateTaskStatus } from "@/actions/tasks";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,11 +14,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AssigneeAvatars, assigneeLabel } from "@/components/shared/assignee-avatars";
 import { CategoryBadge, PriorityBadge } from "@/components/shared/badges";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TaskFormDialog, taskToFormValues, type TaskFormValues } from "@/components/tasks/task-form-dialog";
 import { STATUS_COLORS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
-import { cn, formatDate, getInitials } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import type { TaskFormOptions, TaskListItem } from "@/lib/queries/tasks";
 import type { TaskStatus } from "@/generated/prisma/enums";
 
@@ -229,10 +229,8 @@ function KanbanCard({
 
       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span className="flex min-w-0 items-center gap-1.5">
-          <Avatar className="size-5">
-            <AvatarFallback className="bg-primary/10 text-[9px] text-primary">{getInitials(task.assignee.name)}</AvatarFallback>
-          </Avatar>
-          <span className="truncate">{task.assignee.name}</span>
+          <AssigneeAvatars assignees={task.assignees} size="xs" max={3} />
+          <span className="truncate">{assigneeLabel(task.assignees)}</span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
           {task._count.subtasks > 0 && (

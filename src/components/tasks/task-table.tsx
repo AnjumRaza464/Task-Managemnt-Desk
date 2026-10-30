@@ -7,6 +7,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Check,
   CheckSquare,
   Eye,
   ListTodo,
@@ -19,8 +20,7 @@ import {
   UserRoundCog,
 } from "lucide-react";
 import { toast } from "sonner";
-import { deleteTask, reassignTask, updateTaskStatus } from "@/actions/tasks";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { deleteTask, toggleTaskAssignee, updateTaskStatus } from "@/actions/tasks";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,13 +33,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AssigneeAvatars } from "@/components/shared/assignee-avatars";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TaskFormDialog, taskToFormValues, type TaskFormValues } from "@/components/tasks/task-form-dialog";
 import { useQueryState } from "@/hooks/use-query-state";
 import { RECURRENCE_LABELS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
-import { cn, formatDate, getInitials } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import type { TaskFormOptions, TaskListItem } from "@/lib/queries/tasks";
 
 type SortKey = "title" | "assignee" | "priority" | "status" | "dueDate" | "completion";
@@ -113,14 +114,14 @@ export function TaskTable({
     });
   }
 
-  function reassign(task: TaskListItem, assigneeId: string) {
+  function toggleAssignee(task: TaskListItem, userId: string, assigned: boolean) {
     startTransition(async () => {
-      const result = await reassignTask({ id: task.id, assigneeId });
+      const result = await toggleTaskAssignee({ id: task.id, userId, assigned });
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
-      toast.success("Task reassigned");
+      toast.success(assigned ? "Assignee added" : "Assignee removed");
       router.refresh();
     });
   }
@@ -136,7 +137,7 @@ export function TaskTable({
           <TableHeader>
             <TableRow>
               <Head label="Task" sortKey="title" sortable={sortable} />
-              {showAssignee && <Head label="Assignee" sortKey="assignee" className="hidden md:table-cell" sortable={sortable} />}
+              {showAssignee && <Head label="Assignees" sortKey="assignee" className="hidden md:table-cell" sortable={sortable} />}
               <TableHead className="hidden xl:table-cell">Category</TableHead>
               <Head label="Priority" sortKey="priority" className="hidden sm:table-cell" sortable={sortable} />
               <Head label="Status" sortKey="status" sortable={sortable} />
@@ -180,14 +181,7 @@ export function TaskTable({
                   </TableCell>
                   {showAssignee && (
                     <TableCell className="hidden md:table-cell">
-                      <Link href={`/users/${task.assignee.id}`} className="flex items-center gap-2 hover:underline">
-                        <Avatar className="size-7">
-                          <AvatarFallback className="bg-primary/10 text-[10px] text-primary">
-                            {getInitials(task.assignee.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="truncate text-sm">{task.assignee.name}</span>
-                      </Link>
+                      <AssigneeAvatars assignees={task.assignees} size="md" showNames />
                     </TableCell>
                   )}
                   <TableCell className="hidden xl:table-cell">
@@ -239,14 +233,20 @@ export function TaskTable({
                         </DropdownMenuSub>
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger>
-                            <UserRoundCog /> Reassign
+                            <UserRoundCog /> Assignees
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
-                            {options.users.map((u) => (
-                              <DropdownMenuItem key={u.id} disabled={u.id === task.assigneeId} onClick={() => reassign(task, u.id)}>
-                                {u.name}
-                              </DropdownMenuItem>
-                            ))}
+                            {options.users.map((u) => {
+                              const assigned = task.assignees.some((a) => a.userId === u.id);
+                              return (
+                                <DropdownMenuItem key={u.id} onClick={() => toggleAssignee(task, u.id, !assigned)}>
+                                  <span className={cn("flex size-4 items-center justify-center rounded-[4px] border", assigned ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                                    {assigned && <Check className="size-3" />}
+                                  </span>
+                                  {u.name}
+                                </DropdownMenuItem>
+                              );
+                            })}
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
                         <DropdownMenuSeparator />

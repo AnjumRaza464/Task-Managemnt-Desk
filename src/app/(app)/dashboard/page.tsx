@@ -16,14 +16,13 @@ import { syncOverdueTasks } from "@/lib/overdue";
 import { getDashboardData } from "@/lib/queries/dashboard";
 import { activityDetail, activityLabel } from "@/lib/activity-format";
 import { cn, formatDate, timeAgo } from "@/lib/utils";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { MonthlyChart, PriorityChart, StatusChart, UserChart } from "@/components/dashboard/charts";
-import { getInitials } from "@/lib/utils";
+import { AssigneeAvatars, assigneeLabel } from "@/components/shared/assignee-avatars";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -139,15 +138,13 @@ export default async function DashboardPage() {
               <ul className="divide-y">
                 {data.dueSoon.map((task) => (
                   <li key={task.id} className="flex items-center gap-3 py-2.5">
-                    <Avatar className="size-7">
-                      <AvatarFallback className="bg-primary/10 text-[10px] text-primary">{getInitials(task.assignee.name)}</AvatarFallback>
-                    </Avatar>
+                    <AssigneeAvatars assignees={task.assignees} size="sm" max={2} />
                     <div className="min-w-0 flex-1">
                       <Link href={`/tasks/${task.id}`} className="block truncate text-sm font-medium hover:underline">
                         {task.title}
                       </Link>
                       <p className="text-xs text-muted-foreground">
-                        {task.assignee.name} ·{" "}
+                        {assigneeLabel(task.assignees)} ·{" "}
                         <span className={cn(task.status === "OVERDUE" && "font-medium text-rose-600 dark:text-rose-400")}>
                           due {formatDate(task.dueDate, "MMM d")}
                         </span>

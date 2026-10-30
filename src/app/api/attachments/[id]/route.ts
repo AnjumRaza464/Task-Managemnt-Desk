@@ -9,12 +9,12 @@ export async function GET(_req: Request, { params }: RouteContext<"/api/attachme
   const { id } = await params;
   const attachment = await prisma.attachment.findUnique({
     where: { id },
-    select: { fileName: true, mimeType: true, size: true, data: true, task: { select: { assigneeId: true } } },
+    select: { fileName: true, mimeType: true, size: true, data: true, task: { select: { assignees: { select: { userId: true } } } } },
   });
   if (!attachment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Members may only download attachments from their own tasks.
-  if (user.role === "MEMBER" && attachment.task.assigneeId !== user.id) {
+  if (user.role === "MEMBER" && !attachment.task.assignees.some((a) => a.userId === user.id)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

@@ -24,7 +24,7 @@ export default async function UserDetailPage({ params }: PageProps<"/users/[id]"
   if (!user) notFound();
 
   const tasks = await prisma.task.findMany({
-    where: { assigneeId: id },
+    where: { assignees: { some: { userId: id } } },
     include: taskListInclude,
     orderBy: [{ dueDate: "desc" }],
   });
@@ -42,7 +42,7 @@ export default async function UserDetailPage({ params }: PageProps<"/users/[id]"
         <Button variant="outline" nativeButton={false} render={<Link href="/users" />}>
           <ArrowLeft /> Back to users
         </Button>
-        {user.isActive && <NewTaskButton options={options} defaults={{ assigneeId: user.id }} label="Assign task" />}
+        {user.isActive && <NewTaskButton options={options} defaults={{ assigneeIds: [user.id] }} label="Assign task" />}
       </PageHeader>
 
       <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">

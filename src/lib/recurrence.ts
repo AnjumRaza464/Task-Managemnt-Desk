@@ -64,13 +64,20 @@ export async function spawnNextOccurrence(tx: Tx, task: RecurringTask, actorId: 
   await tx.task.update({ where: { id: task.id }, data: { recurrenceSpawnedAt: new Date() } });
   if (task.recurrenceEndsAt && nextDue > task.recurrenceEndsAt) return null;
 
-  const assignee = await tx.user.findUnique({
-    where: { id: task.assigneeId },
-    select: { id: true, name: true, isActive: true },
+  const assigneeRows = await tx.taskAssignee.findMany({
+    where: { taskId: task.id, user: { isActive: true } },
+    orderBy: { createdAt: "asc" },
+    select: { userId: true },
   });
-  if (!assignee?.isActive) return null;
+  const assigneeIds = assigneeRows.map((a) => a.userId);
+  if (!assigneeIds.includes(task.assigneeId)) {
+    const primary = await tx.user.findUnique({ where: { id: task.assigneeId }, select: { isActive: true } });
+    if (primary?.isActive) assigneeIds.unshift(task.assigneeId);
+  }
+  if (assigneeIds.length === 0) return null;
+  const primaryId = assigneeIds.includes(task.assigneeId) ? task.assigneeId : assigneeIds[0];
 
-  const plan = await resolvePlan(tx, task.assigneeId, nextDue);
+  const plan = await resolvePlan(tx, primaryId, nextDue);
   const subtasks = await tx.subTask.findMany({
     where: { taskId: task.id },
     orderBy: { position: "asc" },
@@ -84,7 +91,7 @@ export async function spawnNextOccurrence(tx: Tx, task: RecurringTask, actorId: 
       title: task.title,
       description: task.description,
       planId: plan.id,
-      assigneeId: task.assigneeId,
+      assigneeId: primaryId,
       createdById: task.createdById,
       categoryId: task.categoryId,
       priority: task.priority,
@@ -97,6 +104,7 @@ export async function spawnNextOccurrence(tx: Tx, task: RecurringTask, actorId: 
       recurrenceEndsAt: task.recurrenceEndsAt,
       recurrenceParentId: task.recurrenceParentId ?? task.id,
       subtasks: { create: subtasks.map((s) => ({ title: s.title, position: s.position })) },
+      assignees: { create: assigneeIds.map((userId) => ({ userId, assignedById: actorId })) },
     },
   });
 
@@ -113,7 +121,7 @@ export async function spawnNextOccurrence(tx: Tx, task: RecurringTask, actorId: 
   );
   await notifyUsers(
     {
-      userIds: [assignee.id],
+      userIds: assigneeIds,
       type: "TASK_ASSIGNED",
       title: "Repeating task scheduled",
       message: `The next "${created.title}" is due ${nextDue.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`,

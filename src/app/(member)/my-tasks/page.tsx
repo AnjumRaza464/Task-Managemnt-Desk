@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckSquare, ListTodo, MessageSquare, Paperclip } from "lucide-react";
+import { CheckSquare, ListTodo, MessageSquare, Paperclip, Users } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { syncOverdueTasks } from "@/lib/overdue";
+import { monthRange } from "@/lib/dates";
 import { taskListInclude } from "@/lib/queries/tasks";
 import { Card, CardContent } from "@/components/ui/card";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { MONTH_NAMES } from "@/lib/constants";
-import { cn, formatDate, parseMonthKey } from "@/lib/utils";
+import { cn, formatDate, monthKey, parseMonthKey } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "My tasks" };
 
@@ -20,58 +21,58 @@ export default async function MyTasksPage({ searchParams }: PageProps<"/my-tasks
   const params = await searchParams;
   const selected = typeof params.month === "string" ? params.month : "";
 
-  const plans = await prisma.monthlyPlan.findMany({
-    where: { userId: user.id },
-    orderBy: [{ year: "desc" }, { month: "desc" }],
-    select: { id: true, year: true, month: true, title: true, _count: { select: { tasks: true } } },
-  });
+  // Every task the user is assigned to (as primary or additional assignee), grouped by due month.
+  const mine = { assignees: { some: { userId: user.id } } };
+  const dueDates = await prisma.task.findMany({ where: mine, select: { dueDate: true } });
+  const monthCounts = new Map<string, number>();
+  for (const t of dueDates) {
+    const key = monthKey(t.dueDate.getFullYear(), t.dueDate.getMonth() + 1);
+    monthCounts.set(key, (monthCounts.get(key) ?? 0) + 1);
+  }
+  const months = [...monthCounts.entries()]
+    .map(([key, count]) => ({ key, count, ...parseMonthKey(key) }))
+    .sort((a, b) => b.year - a.year || b.month - a.month);
 
-  // Default to the current month when a plan exists for it, otherwise the newest plan.
+  // Default to the current month when it has tasks, otherwise the newest month.
   const thisMonth = parseMonthKey(undefined);
-  const hasCurrent = plans.some((p) => p.year === thisMonth.year && p.month === thisMonth.month);
-  const current = selected
-    ? parseMonthKey(selected)
-    : hasCurrent || !plans[0]
-      ? thisMonth
-      : { year: plans[0].year, month: plans[0].month };
-  const activePlan = plans.find((p) => p.year === current.year && p.month === current.month) ?? null;
+  const thisKey = monthKey(thisMonth.year, thisMonth.month);
+  const current = selected ? parseMonthKey(selected) : monthCounts.has(thisKey) || months.length === 0 ? thisMonth : months[0];
+  const currentKey = monthKey(current.year, current.month);
 
-  const tasks = activePlan
-    ? await prisma.task.findMany({
-        where: { planId: activePlan.id, assigneeId: user.id },
-        include: taskListInclude,
-        orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
-      })
-    : [];
+  const tasks = await prisma.task.findMany({
+    where: { ...mine, dueDate: monthRange(current.year, current.month) },
+    include: taskListInclude,
+    orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
+  });
 
   const count = (s: string) => tasks.filter((t) => t.status === s).length;
   const progress = tasks.length ? Math.round(tasks.reduce((sum, t) => sum + t.completion, 0) / tasks.length) : 0;
 
   return (
     <>
-      <PageHeader title={`Hello, ${user.name}`} description="Your monthly plans and assigned tasks. Open a task to update its status and progress." />
+      <PageHeader title={`Hello, ${user.name}`} description="Your assigned tasks by month. Open a task to update its status, progress and discussion." />
 
-      {plans.length === 0 ? (
-        <EmptyState icon={ListTodo} title="No plans yet" description="Your manager has not assigned any monthly tasks to you." />
+      {months.length === 0 ? (
+        <EmptyState icon={ListTodo} title="No tasks yet" description="Nothing has been assigned to you so far." />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
           <div className="space-y-2">
-            <p className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Monthly plans</p>
-            {plans.map((p) => {
-              const active = p.id === activePlan?.id;
+            <p className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Months</p>
+            {months.map((m) => {
+              const active = m.key === currentKey;
               return (
                 <Link
-                  key={p.id}
-                  href={`/my-tasks?month=${p.year}-${String(p.month).padStart(2, "0")}`}
+                  key={m.key}
+                  href={`/my-tasks?month=${m.key}`}
                   className={cn(
                     "flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors hover:bg-accent",
                     active && "border-primary/40 bg-primary/5 font-medium",
                   )}
                 >
                   <span>
-                    {MONTH_NAMES[p.month - 1]} {p.year}
+                    {MONTH_NAMES[m.month - 1]} {m.year}
                   </span>
-                  <span className="text-xs text-muted-foreground">{p._count.tasks} tasks</span>
+                  <span className="text-xs text-muted-foreground">{m.count} tasks</span>
                 </Link>
               );
             })}
@@ -93,14 +94,13 @@ export default async function MyTasksPage({ searchParams }: PageProps<"/my-tasks
               ))}
             </div>
 
-            {activePlan?.title && <p className="text-sm text-muted-foreground">{activePlan.title}</p>}
-
             {tasks.length === 0 ? (
               <EmptyState icon={ListTodo} title="No tasks this month" />
             ) : (
               <div className="grid gap-3">
                 {tasks.map((task) => {
                   const done = task.subtasks.filter((s) => s.isCompleted).length;
+                  const others = task.assignees.filter((a) => a.userId !== user.id);
                   return (
                     <Link key={task.id} href={`/my-tasks/${task.id}`}>
                       <Card className="transition-colors hover:bg-accent/40">
@@ -110,6 +110,11 @@ export default async function MyTasksPage({ searchParams }: PageProps<"/my-tasks
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                               <span>Due {formatDate(task.dueDate)}</span>
                               <CategoryBadge category={task.category} />
+                              {others.length > 0 && (
+                                <span className="inline-flex items-center gap-1" title={others.map((a) => a.user.name).join(", ")}>
+                                  <Users className="size-3" /> with {others.length === 1 ? others[0].user.name : `${others.length} others`}
+                                </span>
+                              )}
                               {task._count.subtasks > 0 && (
                                 <span className="inline-flex items-center gap-1">
                                   <CheckSquare className="size-3" /> {done}/{task._count.subtasks}

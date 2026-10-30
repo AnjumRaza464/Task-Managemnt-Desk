@@ -13,9 +13,10 @@ export async function addComment(input: unknown) {
     const values = commentSchema.parse(input);
     const task = await prisma.task.findUnique({
       where: { id: values.taskId },
-      select: { id: true, title: true, assigneeId: true },
+      select: { id: true, title: true, assignees: { select: { userId: true } } },
     });
     if (!task) throw new ActionError("Task not found.");
+    const assigneeIds = task.assignees.map((a) => a.userId);
 
     const comment = await prisma.comment.create({
       data: { taskId: values.taskId, authorId: manager.id, content: values.content },
@@ -33,11 +34,11 @@ export async function addComment(input: unknown) {
       title: "New comment",
       message: `${manager.name} commented on "${task.title}".`,
       taskId: task.id,
-      excludeUserIds: [manager.id, task.assigneeId],
+      excludeUserIds: [manager.id, ...assigneeIds],
     });
-    // The assignee is told too (unless they wrote the comment).
+    // The assignees are told too (unless they wrote the comment).
     await notifyUsers({
-      userIds: [task.assigneeId],
+      userIds: assigneeIds,
       type: "COMMENT_ADDED",
       title: "New comment on your task",
       message: `${manager.name} commented on "${task.title}".`,

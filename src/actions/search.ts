@@ -33,7 +33,7 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
   if (user.role === "MEMBER") {
     const [tasks, files] = await Promise.all([
       prisma.task.findMany({
-        where: { assigneeId: user.id, OR: [{ title: contains }, { description: contains }] },
+        where: { assignees: { some: { userId: user.id } }, OR: [{ title: contains }, { description: contains }] },
         select: { id: true, title: true, status: true, dueDate: true },
         orderBy: { dueDate: "desc" },
         take: TAKE.tasks,
@@ -64,8 +64,8 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
 
   const [tasks, users, plans, files] = await Promise.all([
     prisma.task.findMany({
-      where: { OR: [{ title: contains }, { description: contains }, { assignee: { name: contains } }] },
-      select: { id: true, title: true, status: true, dueDate: true, assignee: { select: { name: true } } },
+      where: { OR: [{ title: contains }, { description: contains }, { assignees: { some: { user: { name: contains } } } }] },
+      select: { id: true, title: true, status: true, dueDate: true, assignees: { select: { user: { select: { name: true } } } } },
       orderBy: { dueDate: "desc" },
       take: TAKE.tasks,
     }),
@@ -94,7 +94,7 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
     tasks: tasks.map((t) => ({
       id: t.id,
       label: t.title,
-      detail: `${t.assignee.name} · ${STATUS_LABELS[t.status]} · due ${format(t.dueDate, "MMM d")}`,
+      detail: `${t.assignees.map((a) => a.user.name).join(", ") || "Unassigned"} · ${STATUS_LABELS[t.status]} · due ${format(t.dueDate, "MMM d")}`,
       href: `/tasks/${t.id}`,
     })),
     users: users.map((u) => ({ id: u.id, label: u.name, detail: `${ROLE_LABELS[u.role]} · ${u.email}`, href: `/users/${u.id}` })),

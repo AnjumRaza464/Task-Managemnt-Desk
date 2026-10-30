@@ -32,20 +32,21 @@ export async function getUserPerformanceReport(scope: ReportScope) {
       email: true,
       department: true,
       isActive: true,
-      assignedTasks: { where: scopeWhere(scope), select: { status: true, completion: true, priority: true } },
+      taskAssignments: { where: { task: scopeWhere(scope) }, select: { task: { select: { status: true, completion: true, priority: true } } } },
     },
   });
   return users
-    .filter((u) => u.assignedTasks.length > 0 || u.isActive)
+    .map((u) => ({ ...u, tasks: u.taskAssignments.map((a) => a.task) }))
+    .filter((u) => u.tasks.length > 0 || u.isActive)
     .map((u) => ({
       id: u.id,
       name: u.name,
       email: u.email,
       department: u.department,
       isActive: u.isActive,
-      ...summarize(u.assignedTasks),
-      critical: u.assignedTasks.filter((t) => t.priority === "CRITICAL").length,
-      high: u.assignedTasks.filter((t) => t.priority === "HIGH").length,
+      ...summarize(u.tasks),
+      critical: u.tasks.filter((t) => t.priority === "CRITICAL").length,
+      high: u.tasks.filter((t) => t.priority === "HIGH").length,
     }));
 }
 

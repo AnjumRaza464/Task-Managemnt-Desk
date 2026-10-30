@@ -52,7 +52,7 @@ export default async function PlanDetailPage({ params }: PageProps<"/monthly-pla
         {plan.user.isActive && (
           <NewTaskButton
             options={options}
-            defaults={{ assigneeId: plan.user.id, dueDate: defaultDueDate }}
+            defaults={{ assigneeIds: [plan.user.id], dueDate: defaultDueDate }}
             label="Add task"
           />
         )}

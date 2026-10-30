@@ -136,8 +136,23 @@ export async function deleteUser(id: string) {
       await tx.comment.updateMany({ where: { authorId: id }, data: { authorId: manager.id } });
       await tx.attachment.updateMany({ where: { uploadedById: id }, data: { uploadedById: manager.id } });
       await tx.activityLog.updateMany({ where: { actorId: id }, data: { actorId: manager.id } });
-      // Task.assigneeId is a restricting FK, so remove the user's tasks and plans explicitly.
-      // Deleting tasks cascades their subtasks, comments, attachments, activity and notifications.
+      // Tasks shared with other people are handed to the next assignee; tasks only this
+      // user owns are removed (which cascades subtasks, comments, attachments, activity).
+      const shared = await tx.task.findMany({
+        where: { assigneeId: id, assignees: { some: { userId: { not: id } } } },
+        select: { id: true, dueDate: true, assignees: { where: { userId: { not: id } }, orderBy: { createdAt: "asc" }, select: { userId: true }, take: 1 } },
+      });
+      for (const task of shared) {
+        const next = task.assignees[0].userId;
+        const year = task.dueDate.getFullYear();
+        const month = task.dueDate.getMonth() + 1;
+        const plan = await tx.monthlyPlan.upsert({
+          where: { userId_year_month: { userId: next, year, month } },
+          update: {},
+          create: { userId: next, year, month },
+        });
+        await tx.task.update({ where: { id: task.id }, data: { assigneeId: next, planId: plan.id } });
+      }
       await tx.task.deleteMany({ where: { assigneeId: id } });
       await tx.monthlyPlan.deleteMany({ where: { userId: id } });
       await tx.user.delete({ where: { id } });

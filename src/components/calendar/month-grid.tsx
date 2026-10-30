@@ -72,7 +72,7 @@ export function MonthGrid({ year, month, tasks }: { year: number; month: number;
                     <Link
                       key={task.id}
                       href={`/tasks/${task.id}`}
-                      title={`${task.title} · ${task.assignee.name} · ${STATUS_LABELS[task.status]}`}
+                      title={`${task.title} · ${task.assignees.map((a) => a.user.name).join(", ")} · ${STATUS_LABELS[task.status]}`}
                       className={cn(
                         "block truncate rounded-sm border-l-2 bg-muted/60 px-1.5 py-0.5 text-[11px] leading-tight transition-colors hover:bg-accent",
                         task.status === "COMPLETED" && "text-muted-foreground line-through",

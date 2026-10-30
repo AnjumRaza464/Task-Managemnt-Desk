@@ -56,10 +56,10 @@ export function buildTaskWhere(f: Partial<TaskFilters>): Prisma.TaskWhereInput {
     where.OR = [
       { title: { contains: f.q, mode: "insensitive" } },
       { description: { contains: f.q, mode: "insensitive" } },
-      { assignee: { name: { contains: f.q, mode: "insensitive" } } },
+      { assignees: { some: { user: { name: { contains: f.q, mode: "insensitive" } } } } },
     ];
   }
-  if (f.user) where.assigneeId = f.user;
+  if (f.user) where.assignees = { some: { userId: f.user } };
   if (f.status) where.status = f.status;
   if (f.priority) where.priority = f.priority;
   if (f.category) where.categoryId = f.category === "none" ? null : f.category;
@@ -79,8 +79,14 @@ export function buildTaskWhere(f: Partial<TaskFilters>): Prisma.TaskWhereInput {
 const PRIORITY_RANK: Record<Priority, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRITICAL: 3 };
 const STATUS_RANK: Record<TaskStatus, number> = { PENDING: 0, IN_PROGRESS: 1, OVERDUE: 2, COMPLETED: 3, CANCELLED: 4 };
 
+export const assigneeSelect = {
+  orderBy: { createdAt: "asc" },
+  select: { userId: true, user: { select: { id: true, name: true, email: true } } },
+} satisfies Prisma.Task$assigneesArgs;
+
 export const taskListInclude = {
   assignee: { select: { id: true, name: true, email: true } },
+  assignees: assigneeSelect,
   category: { select: { id: true, name: true, color: true } },
   plan: { select: { id: true, year: true, month: true } },
   _count: { select: { subtasks: true, comments: true, attachments: true } },
@@ -143,6 +149,7 @@ export async function getTaskById(id: string) {
     where: { id },
     include: {
       assignee: { select: { id: true, name: true, email: true, designation: true } },
+      assignees: { orderBy: { createdAt: "asc" }, select: { userId: true, user: { select: { id: true, name: true, email: true, designation: true } } } },
       createdBy: { select: { id: true, name: true } },
       category: true,
       plan: { select: { id: true, year: true, month: true, title: true } },

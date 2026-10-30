@@ -37,17 +37,17 @@ export async function getUsers(filters: UserFilters = {}) {
       isActive: true,
       createdAt: true,
       passwordHash: true,
-      _count: { select: { assignedTasks: true } },
-      assignedTasks: { where: { status: "COMPLETED" }, select: { id: true } },
+      _count: { select: { taskAssignments: true } },
+      taskAssignments: { where: { task: { status: "COMPLETED" } }, select: { taskId: true } },
     },
   });
 
   return users.map(({ passwordHash, ...u }) => ({
     ...u,
     hasPassword: Boolean(passwordHash),
-    totalTasks: u._count.assignedTasks,
-    completedTasks: u.assignedTasks.length,
-    assignedTasks: undefined,
+    totalTasks: u._count.taskAssignments,
+    completedTasks: u.taskAssignments.length,
+    taskAssignments: undefined,
     _count: undefined,
   }));
 }
@@ -58,15 +58,14 @@ export async function getUserById(id: string) {
   const user = await prisma.user.findUnique({
     where: { id },
     include: {
-      assignedTasks: {
-        orderBy: { dueDate: "desc" },
-        include: { category: true, plan: true },
+      taskAssignments: {
+        select: { task: { select: { status: true, completion: true } } },
       },
     },
   });
   if (!user) return null;
 
-  const tasks = user.assignedTasks;
+  const tasks = user.taskAssignments.map((a) => a.task);
   const byStatus = (s: string) => tasks.filter((t) => t.status === s).length;
   const stats = {
     total: tasks.length,

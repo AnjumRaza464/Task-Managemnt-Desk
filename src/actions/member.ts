@@ -45,9 +45,9 @@ async function requireUser() {
 
 /** Loads the task and verifies the current user is its assignee. */
 async function loadOwnTask(tx: Prisma.TransactionClient, id: string, userId: string) {
-  const task = await tx.task.findUnique({ where: { id } });
+  const task = await tx.task.findUnique({ where: { id }, include: { assignees: { select: { userId: true } } } });
   if (!task) throw new ActionError("Task not found.");
-  if (task.assigneeId !== userId) throw new UnauthorizedError("You can only update tasks assigned to you.");
+  if (!task.assignees.some((a) => a.userId === userId)) throw new UnauthorizedError("You can only update tasks assigned to you.");
   if (task.status === "CANCELLED") throw new ActionError("This task was cancelled by a manager and cannot be updated.");
   return task;
 }

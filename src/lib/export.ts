@@ -23,7 +23,7 @@ const d = (value: Date | null | undefined) => (value ? format(value, "yyyy-MM-dd
 
 const TASK_HEADERS = [
   "Title",
-  "Assignee",
+  "Assignees",
   "Category",
   "Priority",
   "Status",
@@ -39,7 +39,7 @@ const TASK_HEADERS = [
 function taskRow(t: TaskListItem): Cell[] {
   return [
     t.title,
-    t.assignee.name,
+    t.assignees.map((a) => a.user.name).join(", "),
     t.category?.name ?? "",
     PRIORITY_LABELS[t.priority],
     STATUS_LABELS[t.status],

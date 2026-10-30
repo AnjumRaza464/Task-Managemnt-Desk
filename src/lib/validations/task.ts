@@ -29,7 +29,11 @@ export const taskSchema = z
       .max(5000)
       .optional()
       .transform((v) => (v ? v : null)),
-    assigneeId: z.string().min(1, "Select a user"),
+    assigneeIds: z
+      .array(z.string().min(1))
+      .min(1, "Select at least one user")
+      .max(25, "A task can have at most 25 assignees")
+      .transform((ids) => [...new Set(ids)]),
     categoryId: z
       .string()
       .optional()
@@ -64,9 +68,19 @@ export const taskCompletionSchema = z.object({
   completion: z.coerce.number().int().min(0).max(100),
 });
 
-export const reassignSchema = z.object({
+export const assigneesSchema = z.object({
   id: z.string().min(1),
-  assigneeId: z.string().min(1),
+  assigneeIds: z
+    .array(z.string().min(1))
+    .min(1, "A task needs at least one assignee")
+    .max(25)
+    .transform((ids) => [...new Set(ids)]),
+});
+
+export const toggleAssigneeSchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+  assigned: z.boolean(),
 });
 
 export const subtaskSchema = z.object({

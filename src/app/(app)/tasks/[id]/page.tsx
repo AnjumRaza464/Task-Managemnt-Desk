@@ -9,6 +9,7 @@ import { MONTH_NAMES, RECURRENCE_LABELS } from "@/lib/constants";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AssigneeAvatars, assigneeLabel } from "@/components/shared/assignee-avatars";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { PageHeader } from "@/components/shared/page-header";
 import { ActivityTimeline } from "@/components/tasks/activity-timeline";
@@ -35,7 +36,7 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
 
   return (
     <>
-      <PageHeader title={task.title} description={`${task.assignee.name} · ${monthLabel} plan`}>
+      <PageHeader title={task.title} description={`${assigneeLabel(task.assignees)} · ${monthLabel} plan`}>
         <Button variant="outline" nativeButton={false} render={<Link href="/tasks" />}>
           <ArrowLeft /> All tasks
         </Button>
@@ -48,6 +49,7 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
             title: task.title,
             description: task.description,
             assigneeId: task.assigneeId,
+            assignees: task.assignees,
             categoryId: task.categoryId,
             priority: task.priority,
             status: task.status,
@@ -66,6 +68,7 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
         <PriorityBadge priority={task.priority} />
         <CategoryBadge category={task.category} />
         <span className="text-xs text-muted-foreground">Due {formatDate(task.dueDate)}</span>
+        <AssigneeAvatars assignees={task.assignees} size="sm" max={5} />
         {repeats && (
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <Repeat className="size-3" /> {RECURRENCE_LABELS[task.recurrence]}
@@ -91,7 +94,7 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
 
         <div className="space-y-6">
           <TaskProgressCard
-            task={{ id: task.id, status: task.status, completion: task.completion, assigneeId: task.assigneeId }}
+            task={{ id: task.id, status: task.status, completion: task.completion, assigneeIds: task.assignees.map((a) => a.userId) }}
             options={options}
           />
 
@@ -115,10 +118,17 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
                   {monthLabel}
                 </Link>
               </Row>
-              <Row label="Assignee">
-                <Link href={`/users/${task.assignee.id}`} className="hover:underline">
-                  {task.assignee.name}
-                </Link>
+              <Row label="Assignees">
+                <span className="flex flex-col items-end gap-1">
+                  {task.assignees.map((a) => (
+                    <Link key={a.userId} href={`/users/${a.user.id}`} className="hover:underline">
+                      {a.user.name}
+                      {a.userId === task.assigneeId && task.assignees.length > 1 && (
+                        <span className="ml-1 text-xs text-muted-foreground">(primary)</span>
+                      )}
+                    </Link>
+                  ))}
+                </span>
               </Row>
               <Row label="Created by">{task.createdBy.name}</Row>
               <Row label="Created">{formatDateTime(task.createdAt)}</Row>

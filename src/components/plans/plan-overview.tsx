@@ -130,7 +130,7 @@ export function PlanOverview({
               )}
               <NewTaskButton
                 options={options}
-                defaults={{ assigneeId: row.id, dueDate: defaultDueDate }}
+                defaults={{ assigneeIds: [row.id], dueDate: defaultDueDate }}
                 label="Assign task"
                 size="sm"
                 variant="ghost"

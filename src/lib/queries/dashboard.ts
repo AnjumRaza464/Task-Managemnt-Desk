@@ -31,11 +31,11 @@ export async function getDashboardData() {
     prisma.task.count({ where: { dueDate: todayRange(), status: OPEN } }),
     prisma.task.count({ where: { dueDate: thisWeekRange(), status: OPEN } }),
     prisma.user.findMany({
-      where: { isActive: true, assignedTasks: { some: {} } },
+      where: { isActive: true, taskAssignments: { some: {} } },
       select: {
         id: true,
         name: true,
-        assignedTasks: { select: { status: true, completion: true } },
+        taskAssignments: { select: { task: { select: { status: true, completion: true } } } },
       },
       orderBy: { name: "asc" },
     }),
@@ -79,7 +79,7 @@ export async function getDashboardData() {
   );
 
   const users = userPerformance.map((u) => {
-    const tasks = u.assignedTasks;
+    const tasks = u.taskAssignments.map((a) => a.task);
     const completed = tasks.filter((t) => t.status === "COMPLETED").length;
     const overdue = tasks.filter((t) => t.status === "OVERDUE").length;
     const inProgress = tasks.filter((t) => t.status === "IN_PROGRESS").length;

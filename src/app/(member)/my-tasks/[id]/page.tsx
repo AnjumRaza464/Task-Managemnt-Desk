@@ -19,7 +19,7 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
   const { id } = await params;
   const task = await getTaskById(id);
   // Members can only open tasks assigned to them.
-  if (!task || task.assigneeId !== user.id) notFound();
+  if (!task || !task.assignees.some((a) => a.userId === user.id)) notFound();
 
   const doneSubtasks = task.subtasks.filter((s) => s.isCompleted).length;
   const repeatLabel =
@@ -120,6 +120,13 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
               <Row label="Due date">{formatDate(task.dueDate)}</Row>
               {repeatLabel && <Row label="Repeats">{repeatLabel}</Row>}
               <Row label="Completed">{formatDate(task.completedAt)}</Row>
+              <Row label="Assigned to">
+                <span className="flex flex-col items-end">
+                  {task.assignees.map((a) => (
+                    <span key={a.userId}>{a.userId === user.id ? "You" : a.user.name}</span>
+                  ))}
+                </span>
+              </Row>
               <Row label="Created by">{task.createdBy.name}</Row>
             </CardContent>
           </Card>

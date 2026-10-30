@@ -2,6 +2,7 @@ import "server-only";
 import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { notifyManagers, notifyUsers } from "@/lib/activity";
+import { assigneeNames } from "@/lib/assignees";
 import { today, todayRange } from "@/lib/dates";
 
 let lastRun = 0;
@@ -18,7 +19,14 @@ export async function syncOverdueTasks(force = false) {
   if (!force && now - lastRun < MIN_INTERVAL_MS) return;
   lastRun = now;
 
-  const select = { id: true, title: true, dueDate: true, assigneeId: true, assignee: { select: { name: true } } };
+  const select = {
+    id: true,
+    title: true,
+    dueDate: true,
+    assignees: { select: { userId: true, user: { select: { name: true } } } },
+  };
+  const ids = (t: { assignees: { userId: string }[] }) => t.assignees.map((a) => a.userId);
+  const names = (t: { assignees: { user: { name: string } }[] }) => assigneeNames(t.assignees.map((a) => a.user));
 
   const overdue = await prisma.task.findMany({
     where: { status: { in: ["PENDING", "IN_PROGRESS"] }, dueDate: { lt: today() } },
@@ -34,13 +42,13 @@ export async function syncOverdueTasks(force = false) {
       await notifyManagers({
         type: "TASK_OVERDUE",
         title: "Task overdue",
-        message: `"${task.title}" assigned to ${task.assignee.name} is overdue.`,
+        message: `"${task.title}" assigned to ${names(task)} is overdue.`,
         taskId: task.id,
         dedupeKey: `OVERDUE:${task.id}`,
-        excludeUserId: task.assigneeId,
+        excludeUserIds: ids(task),
       });
       await notifyUsers({
-        userIds: [task.assigneeId],
+        userIds: ids(task),
         type: "TASK_OVERDUE",
         title: "Task overdue",
         message: `"${task.title}" was due ${format(task.dueDate, "MMM d")} and is still open.`,
@@ -59,13 +67,13 @@ export async function syncOverdueTasks(force = false) {
     await notifyManagers({
       type: "TASK_DUE_TODAY",
       title: "Task due today",
-      message: `"${task.title}" assigned to ${task.assignee.name} is due today.`,
+      message: `"${task.title}" assigned to ${names(task)} is due today.`,
       taskId: task.id,
       dedupeKey: `DUE_TODAY:${task.id}:${dayKey}`,
-      excludeUserId: task.assigneeId,
+      excludeUserIds: ids(task),
     });
     await notifyUsers({
-      userIds: [task.assigneeId],
+      userIds: ids(task),
       type: "TASK_DUE_TODAY",
       title: "Task due today",
       message: `"${task.title}" is due today.`,

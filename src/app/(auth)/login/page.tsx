@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LoginForm } from "@/components/auth/login-form";
 import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
 import { BrandLogo, BrandMark } from "@/components/shared/brand-logo";
+import { LoginSceneLoader } from "@/components/auth/login-scene-loader";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -19,6 +20,7 @@ export default async function LoginPage({
       <div className="dark relative hidden overflow-hidden bg-background text-foreground lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div className="absolute -top-32 -right-32 size-96 rounded-full bg-primary/30 blur-3xl" />
         <div className="absolute -bottom-40 -left-24 size-[28rem] rounded-full bg-primary/15 blur-3xl" />
+        <LoginSceneLoader />
         <div className="relative flex items-center gap-3 text-lg font-semibold">
           <BrandLogo plain className="h-12" />
           <span className="sr-only">{APP_NAME}</span>

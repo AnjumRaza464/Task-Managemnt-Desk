@@ -6,11 +6,12 @@ import { GlobalSearch } from "@/components/layout/global-search";
 import { MemberHeaderActions } from "@/components/layout/member-header-actions";
 import { MemberNav } from "@/components/layout/member-nav";
 import { getUnseenFileCount } from "@/lib/queries/files";
+import { getUnreadNotificationCount } from "@/lib/queries/notifications";
 import { ChatWidget } from "@/components/chat/chat-widget";
 
 export default async function MemberLayout({ children }: LayoutProps<"/">) {
   const user = await requireMemberPage();
-  const unseenFiles = await getUnseenFileCount(user.id);
+  const [unseenFiles, unreadNotifications] = await Promise.all([getUnseenFileCount(user.id), getUnreadNotificationCount(user.id)]);
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -20,7 +21,7 @@ export default async function MemberLayout({ children }: LayoutProps<"/">) {
             <BrandMark />
             {APP_NAME}
           </Link>
-          <MemberNav unseenFiles={unseenFiles} />
+          <MemberNav unseenFiles={unseenFiles} unreadNotifications={unreadNotifications} />
           <div className="ml-auto flex items-center gap-1">
             <GlobalSearch scope="member" />
             <MemberHeaderActions user={user} />

@@ -64,6 +64,7 @@ export function NotificationList({
   unreadCount,
   taskHref = "/tasks",
   projectHref = "/projects",
+  basePath = "/notifications",
 }: {
   notifications: Notification[];
   filter: "all" | "unread";
@@ -72,6 +73,8 @@ export function NotificationList({
   taskHref?: string;
   /** Base path for project links (members use /my-projects). */
   projectHref?: string;
+  /** This page's own path, for the All / Unread filter links. */
+  basePath?: string;
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -121,7 +124,7 @@ export function NotificationList({
               size="sm"
               variant={filter === f ? "secondary" : "ghost"}
               nativeButton={false}
-              render={<Link href={f === "all" ? "/notifications" : "/notifications?filter=unread"} />}
+              render={<Link href={f === "all" ? basePath : `${basePath}?filter=unread`} />}
             >
               {f === "all" ? "All" : `Unread${unreadCount ? ` (${unreadCount})` : ""}`}
             </Button>

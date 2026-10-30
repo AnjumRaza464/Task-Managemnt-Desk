@@ -43,6 +43,7 @@ const MEMBER_PAGES: Page[] = [
   { label: "My tasks", href: "/my-tasks", icon: ListTodo },
   { label: "My projects", href: "/my-projects", icon: FolderKanban },
   { label: "Files", href: "/my-files", icon: FolderOpen },
+  { label: "Notifications", href: "/my-notifications", icon: Bell },
 ];
 
 const MIN_QUERY = 2;

@@ -13,9 +13,11 @@ import type { TaskFormOptions } from "@/lib/queries/tasks";
 export function TaskDetailActions({
   task,
   options,
+  afterDeleteHref = "/tasks",
 }: {
   task: Parameters<typeof taskToFormValues>[0];
   options: TaskFormOptions;
+  afterDeleteHref?: string;
 }) {
   const router = useRouter();
   const taskId = task.id;
@@ -43,7 +45,7 @@ export function TaskDetailActions({
           const result = await deleteTask(taskId);
           if (!result.ok) throw new Error(result.error);
           toast.success("Task deleted");
-          router.push("/tasks");
+          router.push(afterDeleteHref);
           router.refresh();
         }}
       />

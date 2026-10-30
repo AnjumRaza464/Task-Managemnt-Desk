@@ -5,12 +5,13 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NavPending } from "@/components/layout/nav-pending";
 
-export function MemberNav({ unseenFiles }: { unseenFiles: number }) {
+export function MemberNav({ unseenFiles, unreadNotifications = 0 }: { unseenFiles: number; unreadNotifications?: number }) {
   const pathname = usePathname();
   const items = [
     { href: "/my-tasks", label: "My tasks", badge: 0 },
     { href: "/my-projects", label: "Projects", badge: 0 },
     { href: "/my-files", label: "Files", badge: unseenFiles },
+    { href: "/my-notifications", label: "Notifications", badge: unreadNotifications },
   ];
 
   return (

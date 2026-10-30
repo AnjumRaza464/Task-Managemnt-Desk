@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireManager } from "@/lib/auth-guard";
+import { UnauthorizedError } from "@/lib/auth-guard";
+import { requireTaskAccess } from "@/lib/permissions";
 import { ActionError, runAction } from "@/lib/action-result";
 import { logActivity } from "@/lib/activity";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
@@ -11,11 +12,11 @@ const BLOCKED_EXTENSIONS = /\.(exe|bat|cmd|sh|msi|dll|js|jar|ps1|vbs)$/i;
 
 export async function uploadAttachment(formData: FormData) {
   return runAction(async () => {
-    const manager = await requireManager();
     const taskId = String(formData.get("taskId") ?? "");
     const file = formData.get("file");
 
     if (!taskId) throw new ActionError("Task is required.");
+    const { user: manager } = await requireTaskAccess(taskId, "canEdit");
     if (!(file instanceof File) || file.size === 0) throw new ActionError("Choose a file to upload.");
     if (file.size > MAX_ATTACHMENT_BYTES) throw new ActionError("File is larger than 5 MB.");
     if (BLOCKED_EXTENSIONS.test(file.name)) throw new ActionError("This file type is not allowed.");
@@ -45,18 +46,22 @@ export async function uploadAttachment(formData: FormData) {
       details: { fileName: attachment.fileName },
     });
     revalidatePath(`/tasks/${taskId}`);
+    revalidatePath(`/my-tasks/${taskId}`);
     return { id: attachment.id };
   });
 }
 
 export async function deleteAttachment(id: string) {
   return runAction(async () => {
-    const manager = await requireManager();
     const attachment = await prisma.attachment.findUnique({
       where: { id },
-      select: { id: true, taskId: true, fileName: true },
+      select: { id: true, taskId: true, fileName: true, uploadedById: true },
     });
     if (!attachment) throw new ActionError("Attachment not found.");
+    const { user: manager, access } = await requireTaskAccess(attachment.taskId, "canEdit");
+    if (attachment.uploadedById !== manager.id && !access.canManage) {
+      throw new UnauthorizedError("You can only remove files you uploaded.");
+    }
     await prisma.attachment.delete({ where: { id } });
     await logActivity({
       actorId: manager.id,
@@ -67,6 +72,7 @@ export async function deleteAttachment(id: string) {
       details: { fileName: attachment.fileName },
     });
     revalidatePath(`/tasks/${attachment.taskId}`);
+    revalidatePath(`/my-tasks/${attachment.taskId}`);
     return undefined;
   });
 }

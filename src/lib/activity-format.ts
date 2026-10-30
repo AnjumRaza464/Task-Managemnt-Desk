@@ -33,6 +33,27 @@ const ACTION_LABELS: Record<string, string> = {
   CATEGORY_DELETED: "deleted a category",
   PROFILE_UPDATED: "updated their profile",
   PASSWORD_CHANGED: "changed their password",
+  TASK_MOVED: "moved the task to another list",
+  TASK_RECURRED: "scheduled the next occurrence",
+  WORKSPACE_CREATED: "created a workspace",
+  WORKSPACE_UPDATED: "updated a workspace",
+  WORKSPACE_DELETED: "deleted a workspace",
+  PROJECT_CREATED: "created the project",
+  PROJECT_UPDATED: "updated the project",
+  PROJECT_STATUS_CHANGED: "changed the project status",
+  PROJECT_DELETED: "deleted a project",
+  PROJECT_MEMBER_ADDED: "added a member",
+  PROJECT_MEMBER_REMOVED: "removed a member",
+  LIST_CREATED: "added a list",
+  LIST_RENAMED: "renamed a list",
+  LIST_DELETED: "deleted a list",
+  MILESTONE_CREATED: "added a milestone",
+  MILESTONE_UPDATED: "updated a milestone",
+  MILESTONE_COMPLETED: "completed a milestone",
+  MILESTONE_REOPENED: "reopened a milestone",
+  MILESTONE_DELETED: "deleted a milestone",
+  DEPENDENCY_ADDED: "added a dependency",
+  DEPENDENCY_REMOVED: "removed a dependency",
 };
 
 type Details = Record<string, unknown> | null | undefined;
@@ -83,7 +104,18 @@ export function activityDetail(action: string, raw: unknown): string {
         .join(" · ");
     }
     case "COMMENT_ADDED":
+    case "COMMENT_REPLIED":
       return typeof details.excerpt === "string" ? `"${details.excerpt}"` : "";
+    case "TASK_MOVED":
+    case "LIST_RENAMED":
+      return details.from && details.to ? `${details.from} → ${details.to}` : "";
+    case "PROJECT_STATUS_CHANGED":
+      return details.from && details.to ? `${String(details.from).toLowerCase().replace(/_/g, " ")} → ${String(details.to).toLowerCase().replace(/_/g, " ")}` : "";
+    case "PROJECT_MEMBER_ADDED":
+      return typeof details.name === "string" ? `${details.name}${details.role ? ` as ${String(details.role).toLowerCase()}` : ""}` : "";
+    case "DEPENDENCY_ADDED":
+    case "DEPENDENCY_REMOVED":
+      return typeof details.blocker === "string" ? `waits for "${details.blocker}"` : "";
     case "ATTACHMENT_ADDED":
     case "ATTACHMENT_DELETED":
     case "FILE_SHARED":
@@ -105,6 +137,20 @@ export function activityDetail(action: string, raw: unknown): string {
     case "USER_ACTIVATED":
     case "USER_DEACTIVATED":
     case "USER_DELETED":
+    case "WORKSPACE_CREATED":
+    case "WORKSPACE_UPDATED":
+    case "WORKSPACE_DELETED":
+    case "PROJECT_CREATED":
+    case "PROJECT_UPDATED":
+    case "PROJECT_DELETED":
+    case "PROJECT_MEMBER_REMOVED":
+    case "LIST_CREATED":
+    case "LIST_DELETED":
+    case "MILESTONE_CREATED":
+    case "MILESTONE_UPDATED":
+    case "MILESTONE_COMPLETED":
+    case "MILESTONE_REOPENED":
+    case "MILESTONE_DELETED":
       return typeof details.title === "string" ? details.title : typeof details.name === "string" ? details.name : "";
     default:
       return "";

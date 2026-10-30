@@ -32,7 +32,7 @@ export function TaskFilters({
   showDates?: boolean;
 }) {
   const { get, set, clear, searchParams } = useQueryState();
-  const hasFilters = ["q", "user", "month", "status", "priority", "category", "dueFrom", "dueTo"].some((k) => searchParams.get(k));
+  const hasFilters = ["q", "user", "month", "status", "priority", "category", "project", "dueFrom", "dueTo"].some((k) => searchParams.get(k));
 
   return (
     <div className="flex flex-col gap-2">
@@ -77,6 +77,15 @@ export function TaskFilters({
           className="w-full sm:w-40"
           options={[{ value: "none", label: "Uncategorized" }, ...options.categories.map((c) => ({ value: c.id, label: c.name }))]}
         />
+        {options.projects.length > 0 && (
+          <SelectField
+            value={get("project")}
+            onChange={(v) => set({ project: v })}
+            placeholder="All projects"
+            className="w-full sm:w-44"
+            options={[{ value: "none", label: "No project" }, ...options.projects.map((p) => ({ value: p.id, label: p.name }))]}
+          />
+        )}
         {showDates && (
           <div className="flex items-center gap-1">
             <Input type="date" aria-label="Due from" value={get("dueFrom")} onChange={(e) => set({ dueFrom: e.target.value })} className="w-36" />

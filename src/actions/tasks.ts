@@ -1,13 +1,15 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
-import { requireManager } from "@/lib/auth-guard";
+import { UnauthorizedError, type CurrentUser } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
 import { logActivity, notifyManagers, notifyUsers } from "@/lib/activity";
 import { assertActiveUsers, assigneeNames, syncTaskAssignees } from "@/lib/assignees";
 import { parseDateInput } from "@/lib/dates";
+import { getProjectAccess, requireTaskAccess, requireUser } from "@/lib/permissions";
+import { ensureProjectMembers, resolveProjectPlacement, revalidateProjectViews } from "@/lib/project-members";
+import { revalidateTaskViews } from "@/lib/task-views";
 import { resolvePlan, spawnNextOccurrence } from "@/lib/recurrence";
 import { normalizeProgress, progressForCompletionChange, progressForStatusChange } from "@/lib/task-progress";
 import {
@@ -21,12 +23,31 @@ import type { Prisma } from "@/generated/prisma/client";
 
 type Tx = Prisma.TransactionClient;
 
-export async function revalidateTaskViews(taskId?: string) {
-  const paths = ["/dashboard", "/tasks", "/tasks/kanban", "/calendar", "/monthly-plans", "/reports", "/users", "/notifications", "/my-tasks"];
-  for (const p of paths) revalidatePath(p);
-  if (taskId) {
-    revalidatePath(`/tasks/${taskId}`);
-    revalidatePath(`/my-tasks/${taskId}`);
+/**
+ * Who may create a task: managers anywhere, project members inside their
+ * project. Members must pick a project.
+ */
+async function requireTaskCreator(projectId: string | null): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (user.role !== "MEMBER") return user;
+  if (!projectId) throw new UnauthorizedError("Pick a project you belong to; only managers can create tasks outside a project.");
+  const access = await getProjectAccess(user, projectId);
+  if (!access?.canEdit) throw new UnauthorizedError("You need to be a member of that project to add tasks.");
+  return user;
+}
+
+/** Members may only assign people who are in the project; managers may assign anyone (they are added to the project). */
+async function assertAssigneesAllowed(user: CurrentUser, projectId: string | null, assigneeIds: string[]) {
+  if (user.role !== "MEMBER" || !projectId) return;
+  const members = await prisma.projectMember.findMany({ where: { projectId, userId: { in: assigneeIds } }, select: { userId: true } });
+  if (members.length !== new Set(assigneeIds).size) throw new ActionError("You can only assign people who are members of this project.");
+}
+
+async function placement(tx: Tx, values: { projectId: string | null; listId: string | null; milestoneId: string | null }) {
+  try {
+    return await resolveProjectPlacement(tx, values);
+  } catch (e) {
+    throw new ActionError(e instanceof Error ? e.message : "Invalid project.");
   }
 }
 
@@ -55,8 +76,9 @@ async function notifyAssigned(tx: Tx, task: { id: string; title: string; dueDate
 
 export async function createTask(input: unknown) {
   return runAction(async () => {
-    const manager = await requireManager();
     const values = taskSchema.parse(input);
+    const manager = await requireTaskCreator(values.projectId);
+    await assertAssigneesAllowed(manager, values.projectId, values.assigneeIds);
     const dueDate = parseDateInput(values.dueDate);
     const startDate = values.startDate ? parseDateInput(values.startDate) : null;
     const recurrenceEndsAt = values.recurrence !== "NONE" && values.recurrenceEndsAt ? parseDateInput(values.recurrenceEndsAt) : null;
@@ -66,7 +88,11 @@ export async function createTask(input: unknown) {
       const primary = assignees[0];
       const plan = await resolvePlan(tx, primary.id, dueDate);
       const progress = normalizeProgress(values.status, values.completion, dueDate);
-      const lastPosition = await tx.task.aggregate({ _max: { position: true }, where: { status: progress.status } });
+      const where = await placement(tx, values);
+      const lastPosition = await tx.task.aggregate({
+        _max: { position: true },
+        where: where.projectId ? { projectId: where.projectId, listId: where.listId } : { status: progress.status },
+      });
 
       const created = await tx.task.create({
         data: {
@@ -76,6 +102,9 @@ export async function createTask(input: unknown) {
           assigneeId: primary.id,
           createdById: manager.id,
           categoryId: values.categoryId,
+          projectId: where.projectId,
+          listId: where.listId,
+          milestoneId: where.milestoneId,
           priority: values.priority,
           status: progress.status,
           completion: progress.completion,
@@ -89,6 +118,7 @@ export async function createTask(input: unknown) {
         },
       });
 
+      if (where.project) await ensureProjectMembers(tx, where.project, assignees.map((a) => a.id), manager.id);
       await logActivity(
         {
           actorId: manager.id,
@@ -96,6 +126,7 @@ export async function createTask(input: unknown) {
           entity: "Task",
           entityId: created.id,
           taskId: created.id,
+          projectId: where.projectId,
           details: { title: created.title, assignee: assigneeNames(assignees), assignees: assignees.map((a) => a.name) },
         },
         tx,
@@ -114,15 +145,21 @@ export async function createTask(input: unknown) {
       return created;
     });
 
-    await revalidateTaskViews(task.id);
+    revalidateTaskViews(task.id);
+    if (task.projectId) revalidateProjectViews(task.projectId);
     return { id: task.id };
   });
 }
 
 export async function updateTask(id: string, input: unknown) {
   return runAction(async () => {
-    const manager = await requireManager();
     const values = taskSchema.parse(input);
+    const { user: manager } = await requireTaskAccess(id, "canManage");
+    if (values.projectId && manager.role === "MEMBER") {
+      const access = await getProjectAccess(manager, values.projectId);
+      if (!access?.canManage) throw new UnauthorizedError("You cannot move the task into that project.");
+    }
+    await assertAssigneesAllowed(manager, values.projectId, values.assigneeIds);
     const dueDate = parseDateInput(values.dueDate);
     const startDate = values.startDate ? parseDateInput(values.startDate) : null;
     const recurrenceEndsAt = values.recurrence !== "NONE" && values.recurrenceEndsAt ? parseDateInput(values.recurrenceEndsAt) : null;
@@ -135,6 +172,7 @@ export async function updateTask(id: string, input: unknown) {
       const primary = assignees[0];
       const plan = await resolvePlan(tx, primary.id, dueDate);
       const progress = normalizeProgress(values.status, values.completion, dueDate, existing.status);
+      const where = await placement(tx, values);
 
       const updated = await tx.task.update({
         where: { id },
@@ -144,6 +182,9 @@ export async function updateTask(id: string, input: unknown) {
           planId: plan.id,
           assigneeId: primary.id,
           categoryId: values.categoryId,
+          projectId: where.projectId,
+          listId: where.listId,
+          milestoneId: where.milestoneId,
           priority: values.priority,
           status: progress.status,
           completion: progress.completion,
@@ -155,6 +196,7 @@ export async function updateTask(id: string, input: unknown) {
         },
       });
       const { added } = await syncTaskAssignees(tx, id, values.assigneeIds, manager.id);
+      if (where.project) await ensureProjectMembers(tx, where.project, assignees.map((a) => a.id), manager.id);
       const before = currentAssignees(existing);
       const assigneesChanged = added.length > 0 || before.length !== assignees.length;
 
@@ -165,6 +207,7 @@ export async function updateTask(id: string, input: unknown) {
       if (existing.completion !== updated.completion) changes.completion = { from: existing.completion, to: updated.completion };
       if (existing.dueDate.getTime() !== updated.dueDate.getTime()) changes.dueDate = { from: existing.dueDate, to: updated.dueDate };
       if (existing.recurrence !== updated.recurrence) changes.recurrence = { from: existing.recurrence, to: updated.recurrence };
+      if (existing.projectId !== updated.projectId) changes.project = { from: existing.projectId, to: updated.projectId };
 
       await logActivity(
         {
@@ -173,6 +216,7 @@ export async function updateTask(id: string, input: unknown) {
           entity: "Task",
           entityId: id,
           taskId: id,
+          projectId: updated.projectId,
           details: { title: updated.title, changes } as Prisma.InputJsonValue,
         },
         tx,
@@ -193,18 +237,20 @@ export async function updateTask(id: string, input: unknown) {
         );
         await spawnNextOccurrence(tx, updated, manager.id);
       }
-      return updated;
+      return { updated, previousProjectId: existing.projectId };
     });
 
-    await revalidateTaskViews(task.id);
-    return { id: task.id };
+    revalidateTaskViews(task.updated.id);
+    if (task.updated.projectId) revalidateProjectViews(task.updated.projectId);
+    if (task.previousProjectId && task.previousProjectId !== task.updated.projectId) revalidateProjectViews(task.previousProjectId);
+    return { id: task.updated.id };
   });
 }
 
 export async function updateTaskStatus(input: unknown) {
   return runAction(async () => {
-    const manager = await requireManager();
     const { id, status } = taskStatusUpdateSchema.parse(input);
+    const { user: manager } = await requireTaskAccess(id, "canUpdateProgress");
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: assigneeInclude });
@@ -249,15 +295,16 @@ export async function updateTaskStatus(input: unknown) {
       return updated;
     });
 
-    await revalidateTaskViews(task.id);
+    revalidateTaskViews(task.id);
+    if (task.projectId) revalidateProjectViews(task.projectId);
     return { status: task.status, completion: task.completion };
   });
 }
 
 export async function updateTaskCompletion(input: unknown) {
   return runAction(async () => {
-    const manager = await requireManager();
     const { id, completion } = taskCompletionSchema.parse(input);
+    const { user: manager } = await requireTaskAccess(id, "canUpdateProgress");
 
     const task = await prisma.$transaction(async (tx) => {
       const existing = await tx.task.findUnique({ where: { id }, include: assigneeInclude });
@@ -298,7 +345,8 @@ export async function updateTaskCompletion(input: unknown) {
       return updated;
     });
 
-    await revalidateTaskViews(task.id);
+    revalidateTaskViews(task.id);
+    if (task.projectId) revalidateProjectViews(task.projectId);
     return { status: task.status, completion: task.completion };
   });
 }
@@ -306,10 +354,12 @@ export async function updateTaskCompletion(input: unknown) {
 /** Replaces the full set of assignees; the first id becomes the primary assignee. */
 export async function setTaskAssignees(input: unknown) {
   return runAction(async () => {
-    const manager = await requireManager();
     const { id, assigneeIds } = assigneesSchema.parse(input);
+    const { user: manager, task: t } = await requireTaskAccess(id, "canManage");
+    await assertAssigneesAllowed(manager, t.projectId, assigneeIds);
     const task = await prisma.$transaction(async (tx) => applyAssignees(tx, id, assigneeIds, manager.id));
-    await revalidateTaskViews(task.id);
+    revalidateTaskViews(task.id);
+    if (task.projectId) revalidateProjectViews(task.projectId);
     return { id: task.id, assigneeIds };
   });
 }
@@ -317,8 +367,9 @@ export async function setTaskAssignees(input: unknown) {
 /** Adds or removes one person without touching the rest. */
 export async function toggleTaskAssignee(input: unknown) {
   return runAction(async () => {
-    const manager = await requireManager();
     const { id, userId, assigned } = toggleAssigneeSchema.parse(input);
+    const { user: manager, task: t } = await requireTaskAccess(id, "canManage");
+    if (assigned) await assertAssigneesAllowed(manager, t.projectId, [userId]);
     const task = await prisma.$transaction(async (tx) => {
       const current = await tx.taskAssignee.findMany({ where: { taskId: id }, orderBy: { createdAt: "asc" }, select: { userId: true } });
       const ids = current.map((a) => a.userId);
@@ -326,7 +377,8 @@ export async function toggleTaskAssignee(input: unknown) {
       if (next.length === 0) throw new ActionError("A task needs at least one assignee.");
       return applyAssignees(tx, id, next, manager.id);
     });
-    await revalidateTaskViews(task.id);
+    revalidateTaskViews(task.id);
+    if (task.projectId) revalidateProjectViews(task.projectId);
     return { id: task.id };
   });
 }
@@ -340,9 +392,14 @@ async function applyAssignees(tx: Tx, id: string, assigneeIds: string[], actorId
   // Keep the current primary assignee when they are still assigned, so the task stays in their plan.
   const primaryId = assigneeIds.includes(existing.assigneeId) ? existing.assigneeId : assigneeIds[0];
   const plan = await resolvePlan(tx, primaryId, existing.dueDate);
-  const updated = await tx.task.update({ where: { id }, data: { assigneeId: primaryId, planId: plan.id } });
+  const updated = await tx.task.update({
+    where: { id },
+    data: { assigneeId: primaryId, planId: plan.id },
+    include: { project: { select: { id: true, name: true } } },
+  });
   const { added, removed } = await syncTaskAssignees(tx, id, assigneeIds, actorId);
   if (added.length === 0 && removed.length === 0) return updated;
+  if (updated.project) await ensureProjectMembers(tx, updated.project, added, actorId);
 
   await logActivity(
     {
@@ -351,6 +408,7 @@ async function applyAssignees(tx: Tx, id: string, assigneeIds: string[], actorId
       entity: "Task",
       entityId: id,
       taskId: id,
+      projectId: updated.projectId,
       details: { title: updated.title, from: assigneeNames(before), to: assigneeNames(assignees) },
     },
     tx,
@@ -371,17 +429,18 @@ async function applyAssignees(tx: Tx, id: string, assigneeIds: string[], actorId
 
 export async function deleteTask(id: string) {
   return runAction(async () => {
-    const manager = await requireManager();
-    const task = await prisma.task.findUnique({ where: { id }, select: { id: true, title: true } });
+    const { user: manager } = await requireTaskAccess(id, "canManage");
+    const task = await prisma.task.findUnique({ where: { id }, select: { id: true, title: true, projectId: true } });
     if (!task) throw new ActionError("Task not found.");
     await prisma.$transaction(async (tx) => {
       await tx.task.delete({ where: { id } });
       await logActivity(
-        { actorId: manager.id, action: "TASK_DELETED", entity: "Task", entityId: id, details: { title: task.title } },
+        { actorId: manager.id, action: "TASK_DELETED", entity: "Task", entityId: id, projectId: task.projectId, details: { title: task.title } },
         tx,
       );
     });
-    await revalidateTaskViews();
+    revalidateTaskViews();
+    if (task.projectId) revalidateProjectViews(task.projectId);
     return undefined;
   });
 }

@@ -9,6 +9,7 @@ export function MemberNav({ unseenFiles }: { unseenFiles: number }) {
   const pathname = usePathname();
   const items = [
     { href: "/my-tasks", label: "My tasks", badge: 0 },
+    { href: "/my-projects", label: "Projects", badge: 0 },
     { href: "/my-files", label: "Files", badge: unseenFiles },
   ];
 

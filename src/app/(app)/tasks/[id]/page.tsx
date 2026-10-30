@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarRange, Repeat } from "lucide-react";
+import { ArrowLeft, CalendarRange, FolderKanban, Repeat } from "lucide-react";
 import { requireManagerPage } from "@/lib/auth-guard";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { getTaskById, getTaskFormOptions } from "@/lib/queries/tasks";
@@ -25,7 +25,7 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
   const manager = await requireManagerPage();
   await syncOverdueTasks();
   const { id } = await params;
-  const [task, options] = await Promise.all([getTaskById(id), getTaskFormOptions()]);
+  const [task, options] = await Promise.all([getTaskById(id), getTaskFormOptions(manager)]);
   if (!task) notFound();
 
   const monthLabel = `${MONTH_NAMES[task.plan.month - 1]} ${task.plan.year}`;
@@ -43,6 +43,11 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
         <Button variant="outline" nativeButton={false} render={<Link href={`/monthly-plans/${task.plan.id}`} />}>
           <CalendarRange /> Open plan
         </Button>
+        {task.project && (
+          <Button variant="outline" nativeButton={false} render={<Link href={`/projects/${task.project.id}`} />}>
+            <FolderKanban /> Open project
+          </Button>
+        )}
         <TaskDetailActions
           task={{
             id: task.id,
@@ -51,6 +56,9 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
             assigneeId: task.assigneeId,
             assignees: task.assignees,
             categoryId: task.categoryId,
+            projectId: task.projectId,
+            listId: task.listId,
+            milestoneId: task.milestoneId,
             priority: task.priority,
             status: task.status,
             completion: task.completion,
@@ -118,6 +126,24 @@ export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]"
                   {monthLabel}
                 </Link>
               </Row>
+              <Row label="Project">
+                {task.project ? (
+                  <Link href={`/projects/${task.project.id}`} className="inline-flex items-center gap-1.5 hover:underline">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: task.project.color }} />
+                    {task.project.name}
+                  </Link>
+                ) : (
+                  "—"
+                )}
+              </Row>
+              {task.project && <Row label="List">{task.list?.name ?? "Unsorted"}</Row>}
+              {task.milestone && (
+                <Row label="Milestone">
+                  <Link href={`/projects/${task.project?.id}?tab=milestones`} className="hover:underline">
+                    {task.milestone.title}
+                  </Link>
+                </Row>
+              )}
               <Row label="Assignees">
                 <span className="flex flex-col items-end gap-1">
                   {task.assignees.map((a) => (

@@ -11,11 +11,12 @@ export type SearchResults = {
   q: string;
   tasks: SearchHit[];
   users: SearchHit[];
+  projects: SearchHit[];
   plans: SearchHit[];
   files: SearchHit[];
 };
 
-const TAKE = { tasks: 8, users: 5, plans: 5, files: 5 };
+const TAKE = { tasks: 8, users: 5, projects: 5, plans: 5, files: 5 };
 
 /**
  * Header search across tasks, users, monthly plans and shared files.
@@ -24,14 +25,14 @@ const TAKE = { tasks: 8, users: 5, plans: 5, files: 5 };
  */
 export async function globalSearch(raw: string): Promise<SearchResults> {
   const q = String(raw ?? "").trim().slice(0, 80);
-  const empty: SearchResults = { q, tasks: [], users: [], plans: [], files: [] };
+  const empty: SearchResults = { q, tasks: [], users: [], projects: [], plans: [], files: [] };
   const user = await getCurrentUser();
   if (!user || q.length < 2) return empty;
 
   const contains = { contains: q, mode: "insensitive" as const };
 
   if (user.role === "MEMBER") {
-    const [tasks, files] = await Promise.all([
+    const [tasks, files, projects] = await Promise.all([
       prisma.task.findMany({
         where: { assignees: { some: { userId: user.id } }, OR: [{ title: contains }, { description: contains }] },
         select: { id: true, title: true, status: true, dueDate: true },
@@ -49,9 +50,16 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
         orderBy: { createdAt: "desc" },
         take: TAKE.files,
       }),
+      prisma.project.findMany({
+        where: { members: { some: { userId: user.id } }, OR: [{ name: contains }, { description: contains }] },
+        select: { id: true, name: true, workspace: { select: { name: true } } },
+        orderBy: { name: "asc" },
+        take: TAKE.projects,
+      }),
     ]);
     return {
       ...empty,
+      projects: projects.map((p) => ({ id: p.id, label: p.name, detail: p.workspace.name, href: `/my-projects/${p.id}` })),
       tasks: tasks.map((t) => ({
         id: t.id,
         label: t.title,
@@ -62,7 +70,7 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
     };
   }
 
-  const [tasks, users, plans, files] = await Promise.all([
+  const [tasks, users, plans, files, projects] = await Promise.all([
     prisma.task.findMany({
       where: { OR: [{ title: contains }, { description: contains }, { assignees: { some: { user: { name: contains } } } }] },
       select: { id: true, title: true, status: true, dueDate: true, assignees: { select: { user: { select: { name: true } } } } },
@@ -87,10 +95,22 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
       orderBy: { createdAt: "desc" },
       take: TAKE.files,
     }),
+    prisma.project.findMany({
+      where: { OR: [{ name: contains }, { description: contains }, { workspace: { name: contains } }] },
+      select: { id: true, name: true, status: true, workspace: { select: { name: true } }, _count: { select: { tasks: true } } },
+      orderBy: { name: "asc" },
+      take: TAKE.projects,
+    }),
   ]);
 
   return {
     q,
+    projects: projects.map((p) => ({
+      id: p.id,
+      label: p.name,
+      detail: `${p.workspace.name} · ${p._count.tasks} task${p._count.tasks === 1 ? "" : "s"}`,
+      href: `/projects/${p.id}`,
+    })),
     tasks: tasks.map((t) => ({
       id: t.id,
       label: t.title,

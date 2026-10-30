@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Circle, Download, Paperclip } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Download, FolderKanban, Paperclip } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { getTaskById } from "@/lib/queries/tasks";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,11 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
         <Button variant="outline" nativeButton={false} render={<Link href="/my-tasks" />}>
           <ArrowLeft /> Back to my tasks
         </Button>
+        {task.project && (
+          <Button variant="outline" nativeButton={false} render={<Link href={`/my-projects/${task.project.id}`} />}>
+            <FolderKanban /> {task.project.name}
+          </Button>
+        )}
       </PageHeader>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
@@ -116,6 +121,15 @@ export default async function MemberTaskPage({ params }: PageProps<"/my-tasks/[i
               <Row label="Category">
                 <CategoryBadge category={task.category} />
               </Row>
+              {task.project && (
+                <Row label="Project">
+                  <Link href={`/my-projects/${task.project.id}`} className="hover:underline">
+                    {task.project.name}
+                  </Link>
+                </Row>
+              )}
+              {task.project && <Row label="List">{task.list?.name ?? "Unsorted"}</Row>}
+              {task.milestone && <Row label="Milestone">{task.milestone.title}</Row>}
               <Row label="Start date">{formatDate(task.startDate)}</Row>
               <Row label="Due date">{formatDate(task.dueDate)}</Row>
               {repeatLabel && <Row label="Repeats">{repeatLabel}</Row>}

@@ -38,6 +38,18 @@ export const taskSchema = z
       .string()
       .optional()
       .transform((v) => (v ? v : null)),
+    projectId: z
+      .string()
+      .optional()
+      .transform((v) => (v ? v : null)),
+    listId: z
+      .string()
+      .optional()
+      .transform((v) => (v ? v : null)),
+    milestoneId: z
+      .string()
+      .optional()
+      .transform((v) => (v ? v : null)),
     priority: PRIORITY.default("MEDIUM"),
     status: TASK_STATUS.default("PENDING"),
     completion: z.coerce.number().int().min(0).max(100).default(0),

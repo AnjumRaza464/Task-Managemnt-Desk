@@ -35,6 +35,7 @@ function revalidateAll(taskId: string) {
     "/notifications",
   ];
   for (const p of paths) revalidatePath(p);
+  revalidatePath("/my-projects");
 }
 
 async function requireUser() {

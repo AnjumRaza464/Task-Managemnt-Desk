@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarDays, CheckSquare, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { CalendarDays, CheckSquare, Eye, FolderKanban, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteTask, updateTaskStatus } from "@/actions/tasks";
 import { Button } from "@/components/ui/button";
@@ -218,6 +218,11 @@ function KanbanCard({
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <PriorityBadge priority={task.priority} className="px-1.5 py-0 text-[10px]" />
         <CategoryBadge category={task.category} />
+        {task.project && (
+          <span className="inline-flex max-w-full items-center gap-1 truncate text-[10px] text-muted-foreground" title={task.project.name}>
+            <FolderKanban className="size-3 shrink-0" style={{ color: task.project.color }} /> <span className="truncate">{task.project.name}</span>
+          </span>
+        )}
       </div>
 
       <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-muted">

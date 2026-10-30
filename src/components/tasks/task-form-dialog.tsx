@@ -37,6 +37,9 @@ export type TaskFormValues = {
   description: string;
   assigneeIds: string[];
   categoryId: string;
+  projectId: string;
+  listId: string;
+  milestoneId: string;
   priority: Priority;
   status: TaskStatus;
   completion: number;
@@ -52,6 +55,9 @@ export function emptyTaskValues(defaults: Partial<TaskFormValues> = {}): TaskFor
     description: "",
     assigneeIds: [],
     categoryId: "",
+    projectId: "",
+    listId: "",
+    milestoneId: "",
     priority: "MEDIUM",
     status: "PENDING",
     completion: 0,
@@ -70,6 +76,7 @@ export function TaskFormDialog({
   options,
   defaults,
   onSaved,
+  lockProject = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -77,6 +84,8 @@ export function TaskFormDialog({
   options: TaskFormOptions;
   defaults?: Partial<TaskFormValues>;
   onSaved?: (id: string) => void;
+  /** Hide the project picker (the dialog was opened from inside a project). */
+  lockProject?: boolean;
 }) {
   const router = useRouter();
   const [values, setValues] = useState<TaskFormValues>(task ?? emptyTaskValues(defaults));
@@ -100,6 +109,32 @@ export function TaskFormDialog({
     setValues((v) => ({ ...v, [key]: value }));
   const err = (key: string) => errors[key]?.[0];
   const repeats = values.recurrence !== "NONE";
+  const project = options.projects.find((p) => p.id === values.projectId) ?? null;
+  // Members may only assign people who are on the project.
+  const assignable = project && !options.canCreateOutsideProject ? options.users.filter((u) => project.memberIds.includes(u.id)) : options.users;
+  const projectOptions = options.projects.map((p) => ({
+    value: p.id,
+    textLabel: `${p.workspace.name} / ${p.name}`,
+    label: (
+      <span className="flex items-center gap-2">
+        <span className="size-2 rounded-full" style={{ backgroundColor: p.color }} />
+        <span className="truncate">
+          {p.name} <span className="text-muted-foreground">· {p.workspace.name}</span>
+        </span>
+      </span>
+    ),
+  }));
+
+  function changeProject(projectId: string) {
+    const next = options.projects.find((p) => p.id === projectId);
+    setValues((v) => ({
+      ...v,
+      projectId,
+      listId: next?.lists.some((l) => l.id === v.listId) ? v.listId : (next?.lists[0]?.id ?? ""),
+      milestoneId: next?.milestones.some((m) => m.id === v.milestoneId) ? v.milestoneId : "",
+      assigneeIds: next && !options.canCreateOutsideProject ? v.assigneeIds.filter((id) => next.memberIds.includes(id)) : v.assigneeIds,
+    }));
+  }
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -125,7 +160,9 @@ export function TaskFormDialog({
           <DialogHeader>
             <DialogTitle>{isEdit ? "Edit task" : "New task"}</DialogTitle>
             <DialogDescription>
-              The task is placed in the assignee&apos;s monthly plan based on its due date.
+              {project
+                ? `The task goes into ${project.name} and into the primary assignee's monthly plan.`
+                : "The task is placed in the primary assignee's monthly plan based on its due date."}
             </DialogDescription>
           </DialogHeader>
 
@@ -145,14 +182,51 @@ export function TaskFormDialog({
                 placeholder="What needs to be done?"
               />
             </div>
+            {!lockProject && (options.projects.length > 0 || !options.canCreateOutsideProject) && (
+              <div className="space-y-1.5">
+                <Label htmlFor="project">Project</Label>
+                <SelectField
+                  id="project"
+                  value={values.projectId}
+                  onChange={changeProject}
+                  placeholder={options.canCreateOutsideProject ? "No project" : "Select a project"}
+                  options={options.canCreateOutsideProject ? [{ value: "", label: "No project" }, ...projectOptions].filter((o) => o.value) : projectOptions}
+                />
+                {err("projectId") && <p className="text-xs text-destructive">{err("projectId")}</p>}
+              </div>
+            )}
+            {project && (
+              <div className="space-y-1.5">
+                <Label htmlFor="list">List</Label>
+                <SelectField
+                  id="list"
+                  value={values.listId}
+                  onChange={(v) => set("listId", v)}
+                  placeholder="Unsorted"
+                  options={project.lists.map((l) => ({ value: l.id, label: l.name }))}
+                />
+              </div>
+            )}
+            {project && project.milestones.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="milestone">Milestone</Label>
+                <SelectField
+                  id="milestone"
+                  value={values.milestoneId}
+                  onChange={(v) => set("milestoneId", v)}
+                  placeholder="No milestone"
+                  options={project.milestones.map((m) => ({ value: m.id, label: m.title }))}
+                />
+              </div>
+            )}
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="assignees">Assign to</Label>
               <UserMultiSelect
                 id="assignees"
                 value={values.assigneeIds}
                 onChange={(ids) => set("assigneeIds", ids)}
-                users={options.users}
-                placeholder="Select one or more people"
+                users={assignable}
+                placeholder={project && !options.canCreateOutsideProject ? "Select project members" : "Select one or more people"}
               />
               {err("assigneeIds") && <p className="text-xs text-destructive">{err("assigneeIds")}</p>}
             </div>
@@ -271,6 +345,9 @@ export function taskToFormValues(task: {
   assigneeId: string;
   assignees?: { userId: string }[];
   categoryId: string | null;
+  projectId?: string | null;
+  listId?: string | null;
+  milestoneId?: string | null;
   priority: Priority;
   status: TaskStatus;
   completion: number;
@@ -285,6 +362,9 @@ export function taskToFormValues(task: {
     description: task.description ?? "",
     assigneeIds: task.assignees?.length ? task.assignees.map((a) => a.userId) : [task.assigneeId],
     categoryId: task.categoryId ?? "",
+    projectId: task.projectId ?? "",
+    listId: task.listId ?? "",
+    milestoneId: task.milestoneId ?? "",
     priority: task.priority,
     status: task.status,
     completion: task.completion,

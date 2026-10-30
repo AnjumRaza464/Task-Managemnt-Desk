@@ -7,6 +7,7 @@ import {
   Bell,
   CalendarDays,
   CalendarRange,
+  FolderKanban,
   FolderOpen,
   KanbanSquare,
   LayoutDashboard,
@@ -26,6 +27,7 @@ type Page = { label: string; href: string; icon: LucideIcon };
 const MANAGER_PAGES: Page[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Users", href: "/users", icon: Users },
+  { label: "Projects", href: "/workspaces", icon: FolderKanban },
   { label: "Monthly plans", href: "/monthly-plans", icon: CalendarRange },
   { label: "All tasks", href: "/tasks", icon: ListTodo },
   { label: "Kanban", href: "/tasks/kanban", icon: KanbanSquare },
@@ -39,6 +41,7 @@ const MANAGER_PAGES: Page[] = [
 
 const MEMBER_PAGES: Page[] = [
   { label: "My tasks", href: "/my-tasks", icon: ListTodo },
+  { label: "My projects", href: "/my-projects", icon: FolderKanban },
   { label: "Files", href: "/my-files", icon: FolderOpen },
 ];
 
@@ -87,7 +90,7 @@ export function GlobalSearch({ scope }: { scope: "manager" | "member" }) {
   const pages = (scope === "manager" ? MANAGER_PAGES : MEMBER_PAGES).filter(
     (p) => q.length === 0 || p.label.toLowerCase().includes(q.toLowerCase()),
   );
-  const hitCount = fresh ? fresh.tasks.length + fresh.users.length + fresh.plans.length + fresh.files.length : 0;
+  const hitCount = fresh ? fresh.tasks.length + fresh.users.length + fresh.projects.length + fresh.plans.length + fresh.files.length : 0;
   const nothing = !searching && q.length >= MIN_QUERY && hitCount === 0 && pages.length === 0;
 
   function go(href: string) {
@@ -155,6 +158,7 @@ export function GlobalSearch({ scope }: { scope: "manager" | "member" }) {
             )}
             {fresh && hits("Tasks", fresh.tasks, ListTodo)}
             {fresh && hits("Users", fresh.users, Users)}
+            {fresh && hits("Projects", fresh.projects, FolderKanban)}
             {fresh && hits("Monthly plans", fresh.plans, CalendarRange)}
             {fresh && hits("Files", fresh.files, FolderOpen)}
             {pages.length > 0 && (

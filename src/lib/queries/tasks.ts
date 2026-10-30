@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { PAGE_SIZE, PRIORITIES, TASK_STATUSES } from "@/lib/constants";
 import { monthRange, parseDateInput } from "@/lib/dates";
 import { parseMonthKey } from "@/lib/utils";
+import type { CurrentUser } from "@/lib/auth-guard";
+import { getProjectOptions } from "@/lib/queries/projects";
+import { assigneeSelect } from "@/lib/queries/selects";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Priority, TaskStatus } from "@/generated/prisma/enums";
 
@@ -13,6 +16,7 @@ export type TaskFilters = {
   status: TaskStatus | "";
   priority: Priority | "";
   category: string;
+  project: string;
   dueFrom: string;
   dueTo: string;
   sort: "dueDate" | "priority" | "status" | "title" | "createdAt" | "completion" | "assignee";
@@ -38,6 +42,7 @@ export function parseTaskFilters(params: SearchParams): TaskFilters {
     status: (TASK_STATUSES as string[]).includes(status) ? (status as TaskStatus) : "",
     priority: (PRIORITIES as string[]).includes(priority) ? (priority as Priority) : "",
     category: str(params.category),
+    project: str(params.project),
     dueFrom: /^\d{4}-\d{2}-\d{2}$/.test(str(params.dueFrom)) ? str(params.dueFrom) : "",
     dueTo: /^\d{4}-\d{2}-\d{2}$/.test(str(params.dueTo)) ? str(params.dueTo) : "",
     sort: (["dueDate", "priority", "status", "title", "createdAt", "completion", "assignee"] as const).includes(
@@ -63,6 +68,7 @@ export function buildTaskWhere(f: Partial<TaskFilters>): Prisma.TaskWhereInput {
   if (f.status) where.status = f.status;
   if (f.priority) where.priority = f.priority;
   if (f.category) where.categoryId = f.category === "none" ? null : f.category;
+  if (f.project) where.projectId = f.project === "none" ? null : f.project;
   if (f.month) {
     const { year, month } = parseMonthKey(f.month);
     where.plan = { year, month };
@@ -79,17 +85,15 @@ export function buildTaskWhere(f: Partial<TaskFilters>): Prisma.TaskWhereInput {
 const PRIORITY_RANK: Record<Priority, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRITICAL: 3 };
 const STATUS_RANK: Record<TaskStatus, number> = { PENDING: 0, IN_PROGRESS: 1, OVERDUE: 2, COMPLETED: 3, CANCELLED: 4 };
 
-export const assigneeSelect = {
-  orderBy: { createdAt: "asc" },
-  select: { userId: true, user: { select: { id: true, name: true, email: true } } },
-} satisfies Prisma.Task$assigneesArgs;
-
 export const taskListInclude = {
   assignee: { select: { id: true, name: true, email: true } },
   assignees: assigneeSelect,
   category: { select: { id: true, name: true, color: true } },
   plan: { select: { id: true, year: true, month: true } },
-  _count: { select: { subtasks: true, comments: true, attachments: true } },
+  project: { select: { id: true, name: true, color: true } },
+  list: { select: { id: true, name: true } },
+  milestone: { select: { id: true, title: true } },
+  _count: { select: { subtasks: true, comments: true, attachments: true, blockedBy: true } },
   subtasks: { select: { isCompleted: true } },
 } satisfies Prisma.TaskInclude;
 
@@ -153,6 +157,11 @@ export async function getTaskById(id: string) {
       createdBy: { select: { id: true, name: true } },
       category: true,
       plan: { select: { id: true, year: true, month: true, title: true } },
+      project: { select: { id: true, name: true, color: true, workspace: { select: { id: true, name: true } } } },
+      list: { select: { id: true, name: true } },
+      milestone: { select: { id: true, title: true, dueDate: true, completedAt: true } },
+      blockedBy: { select: { blocker: { select: { id: true, title: true, status: true, dueDate: true } } } },
+      blocks: { select: { blocked: { select: { id: true, title: true, status: true, dueDate: true } } } },
       subtasks: { orderBy: { position: "asc" } },
       comments: { orderBy: { createdAt: "desc" }, include: { author: { select: { id: true, name: true } } } },
       attachments: {
@@ -166,16 +175,22 @@ export async function getTaskById(id: string) {
 
 export type TaskDetail = NonNullable<Awaited<ReturnType<typeof getTaskById>>>;
 
-export async function getTaskFormOptions() {
-  const [users, categories] = await Promise.all([
+/**
+ * Users, categories and projects for the task form. Managers get everything;
+ * a member only gets the projects they belong to (users are still listed so
+ * names resolve; the form restricts assignees to project members).
+ */
+export async function getTaskFormOptions(user?: CurrentUser) {
+  const [users, categories, projects] = await Promise.all([
     prisma.user.findMany({
       where: { isActive: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, role: true },
+      select: { id: true, name: true, email: true, role: true },
     }),
     prisma.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, color: true } }),
+    user ? getProjectOptions(user) : getProjectOptions({ id: "", name: "", email: "", role: "ADMIN" }),
   ]);
-  return { users, categories };
+  return { users, categories, projects, canCreateOutsideProject: !user || user.role !== "MEMBER" };
 }
 
 export type TaskFormOptions = Awaited<ReturnType<typeof getTaskFormOptions>>;

@@ -14,6 +14,7 @@ import {
   Settings,
   Timer,
   FolderOpen,
+  FolderKanban,
 } from "lucide-react";
 import {
   Sidebar,
@@ -44,6 +45,7 @@ const NAV = [
     label: "Planning",
     items: [
       { title: "Users", href: "/users", icon: Users },
+      { title: "Projects", href: "/workspaces", icon: FolderKanban },
       { title: "Monthly Plans", href: "/monthly-plans", icon: CalendarRange },
       { title: "All Tasks", href: "/tasks", icon: ListTodo, exact: true },
       { title: "Kanban", href: "/tasks/kanban", icon: KanbanSquare },
@@ -74,6 +76,7 @@ export function AppSidebar({
   const isActive = (href: string, exact?: boolean) => {
     if (exact) return pathname === href;
     if (href === "/tasks") return pathname === "/tasks" || pathname.startsWith("/tasks/") && !pathname.startsWith("/tasks/kanban");
+    if (href === "/workspaces") return pathname === "/workspaces" || pathname.startsWith("/projects/");
     return pathname === href || pathname.startsWith(href + "/");
   };
 

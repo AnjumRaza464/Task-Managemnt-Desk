@@ -10,7 +10,10 @@ import {
   Check,
   CheckSquare,
   Eye,
+  FolderInput,
+  FolderKanban,
   ListTodo,
+  Lock,
   MessageSquare,
   MoreHorizontal,
   Paperclip,
@@ -20,6 +23,7 @@ import {
   UserRoundCog,
 } from "lucide-react";
 import { toast } from "sonner";
+import { moveTaskToList } from "@/actions/lists";
 import { deleteTask, toggleTaskAssignee, updateTaskStatus } from "@/actions/tasks";
 import { Button } from "@/components/ui/button";
 import {
@@ -89,6 +93,9 @@ export function TaskTable({
   sortable = true,
   emptyTitle = "No tasks found",
   emptyDescription = "Try adjusting your filters or create a new task.",
+  taskHref = "/tasks",
+  canManage = true,
+  showProject = true,
 }: {
   tasks: TaskListItem[];
   options: TaskFormOptions;
@@ -96,6 +103,11 @@ export function TaskTable({
   sortable?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Base path for task links ("/my-tasks" for members). */
+  taskHref?: string;
+  /** Hide edit / assign / delete when the viewer cannot manage these tasks. */
+  canManage?: boolean;
+  showProject?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<TaskFormValues | null>(null);
@@ -110,6 +122,18 @@ export function TaskTable({
         return;
       }
       toast.success(`Status set to ${STATUS_LABELS[result.data.status]}`);
+      router.refresh();
+    });
+  }
+
+  function moveToList(task: TaskListItem, listId: string | null) {
+    startTransition(async () => {
+      const result = await moveTaskToList({ id: task.id, listId });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Task moved");
       router.refresh();
     });
   }
@@ -152,10 +176,24 @@ export function TaskTable({
               return (
                 <TableRow key={task.id}>
                   <TableCell className="max-w-[18rem]">
-                    <Link href={`/tasks/${task.id}`} className="block truncate font-medium hover:underline">
+                    <Link href={`${taskHref}/${task.id}`} className="block truncate font-medium hover:underline">
                       {task.title}
                     </Link>
-                    <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      {showProject && task.project && (
+                        <span className="inline-flex max-w-40 items-center gap-1 truncate" title={`${task.project.name}${task.list ? ` · ${task.list.name}` : ""}`}>
+                          <FolderKanban className="size-3 shrink-0" style={{ color: task.project.color }} />
+                          <span className="truncate">
+                            {task.project.name}
+                            {task.list && <span className="text-muted-foreground/70"> / {task.list.name}</span>}
+                          </span>
+                        </span>
+                      )}
+                      {task._count.blockedBy > 0 && (
+                        <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300" title="Has dependencies">
+                          <Lock className="size-3" /> {task._count.blockedBy}
+                        </span>
+                      )}
                       {task.recurrence !== "NONE" && (
                         <span className="inline-flex items-center gap-1" title={`Repeats: `}>
                           <Repeat className="size-3" /> {RECURRENCE_LABELS[task.recurrence]}
@@ -213,12 +251,14 @@ export function TaskTable({
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-44">
-                        <DropdownMenuItem render={<Link href={`/tasks/${task.id}`} />}>
+                        <DropdownMenuItem render={<Link href={`${taskHref}/${task.id}`} />}>
                           <Eye /> View details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setEditing(taskToFormValues(task))}>
-                          <Pencil /> Edit
-                        </DropdownMenuItem>
+                        {canManage && (
+                          <DropdownMenuItem onClick={() => setEditing(taskToFormValues(task))}>
+                            <Pencil /> Edit
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger>
                             <CheckSquare /> Set status
@@ -231,6 +271,24 @@ export function TaskTable({
                             ))}
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
+                        {task.project && (
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              <FolderInput /> Move to list
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              {(options.projects.find((p) => p.id === task.project?.id)?.lists ?? []).map((l) => (
+                                <DropdownMenuItem key={l.id} disabled={l.id === task.list?.id} onClick={() => moveToList(task, l.id)}>
+                                  {l.name}
+                                </DropdownMenuItem>
+                              ))}
+                              <DropdownMenuItem disabled={!task.list} onClick={() => moveToList(task, null)}>
+                                Unsorted
+                              </DropdownMenuItem>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                        )}
+                        {canManage && (
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger>
                             <UserRoundCog /> Assignees
@@ -249,10 +307,15 @@ export function TaskTable({
                             })}
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem variant="destructive" onClick={() => setDeleting(task)}>
-                          <Trash2 /> Delete
-                        </DropdownMenuItem>
+                        )}
+                        {canManage && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem variant="destructive" onClick={() => setDeleting(task)}>
+                              <Trash2 /> Delete
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

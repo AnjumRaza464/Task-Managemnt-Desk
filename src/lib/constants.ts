@@ -1,4 +1,4 @@
-import type { Priority, Recurrence, Role, TaskStatus } from "@/generated/prisma/enums";
+import type { Priority, ProjectRole, ProjectStatus, Recurrence, Role, TaskStatus } from "@/generated/prisma/enums";
 
 export const APP_NAME = "AI Research Lab";
 export const APP_DESCRIPTION = "Monthly task planning & management for managers";
@@ -105,3 +105,37 @@ export const RECURRENCE_LABELS: Record<Recurrence, string> = {
   BIWEEKLY: "Every 2 weeks",
   MONTHLY: "Monthly",
 };
+
+export const PROJECT_ROLES: ProjectRole[] = ["OWNER", "MANAGER", "MEMBER", "VIEWER"];
+
+export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
+  OWNER: "Owner",
+  MANAGER: "Project manager",
+  MEMBER: "Member",
+  VIEWER: "Viewer",
+};
+
+export const PROJECT_ROLE_HINTS: Record<ProjectRole, string> = {
+  OWNER: "Full control, including members and settings",
+  MANAGER: "Manages lists, milestones, members and every task",
+  MEMBER: "Creates tasks, moves tasks between lists, updates own tasks, comments",
+  VIEWER: "Reads and comments only",
+};
+
+export const PROJECT_STATUSES: ProjectStatus[] = ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"];
+
+export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
+  ACTIVE: "Active",
+  ON_HOLD: "On hold",
+  COMPLETED: "Completed",
+  ARCHIVED: "Archived",
+};
+
+export const PROJECT_STATUS_STYLES: Record<ProjectStatus, string> = {
+  ACTIVE: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30",
+  ON_HOLD: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30",
+  COMPLETED: "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30",
+  ARCHIVED: "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-500/15 dark:text-zinc-400 dark:border-zinc-500/30",
+};
+
+export const PROJECT_COLORS = ["#6366f1", "#ec4899", "#f59e0b", "#10b981", "#0ea5e9", "#8b5cf6", "#14b8a6", "#f43f5e", "#64748b"];

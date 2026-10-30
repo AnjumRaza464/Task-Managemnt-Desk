@@ -9,9 +9,23 @@ export async function logActivity(
   input: {
     actorId: string;
     action: string;
-    entity: "Task" | "User" | "MonthlyPlan" | "Category" | "SubTask" | "Comment" | "Attachment" | "SharedFile";
+    entity:
+      | "Task"
+      | "User"
+      | "MonthlyPlan"
+      | "Category"
+      | "SubTask"
+      | "Comment"
+      | "Attachment"
+      | "SharedFile"
+      | "Workspace"
+      | "Project"
+      | "List"
+      | "Milestone"
+      | "TaskDependency";
     entityId: string;
     taskId?: string | null;
+    projectId?: string | null;
     details?: Prisma.InputJsonValue;
   },
   tx: Tx = prisma,
@@ -23,6 +37,7 @@ export async function logActivity(
       entity: input.entity,
       entityId: input.entityId,
       taskId: input.taskId ?? null,
+      projectId: input.projectId ?? null,
       details: input.details,
     },
   });
@@ -34,6 +49,7 @@ export type NotifyInput = {
   title: string;
   message: string;
   taskId?: string | null;
+  projectId?: string | null;
   /** Prevents the same notification (per user) being created twice. */
   dedupeKey?: string;
   excludeUserId?: string;
@@ -66,6 +82,7 @@ export async function notifyUsers(input: NotifyInput, tx: Tx = prisma): Promise<
     data: targets.map((userId) => ({
       userId,
       taskId: input.taskId ?? null,
+      projectId: input.projectId ?? null,
       type: input.type,
       title: input.title,
       message: input.message,

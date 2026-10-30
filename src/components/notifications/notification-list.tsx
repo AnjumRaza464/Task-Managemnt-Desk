@@ -9,11 +9,15 @@ import {
   CalendarClock,
   CheckCheck,
   CheckCircle2,
+  AtSign,
+  Flag,
+  FolderKanban,
   FolderOpen,
   Info,
   Loader2,
   MessageSquare,
   Trash2,
+  Unlock,
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -37,6 +41,7 @@ type Notification = {
   isRead: boolean;
   createdAt: Date;
   task: { id: string; title: string } | null;
+  project: { id: string; name: string } | null;
 };
 
 const ICONS: Record<NotificationType, { icon: LucideIcon; tone: string }> = {
@@ -47,16 +52,26 @@ const ICONS: Record<NotificationType, { icon: LucideIcon; tone: string }> = {
   COMMENT_ADDED: { icon: MessageSquare, tone: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
   FILE_SHARED: { icon: FolderOpen, tone: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
   SYSTEM: { icon: Info, tone: "bg-muted text-muted-foreground" },
+  MENTIONED: { icon: AtSign, tone: "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300" },
+  PROJECT_ADDED: { icon: FolderKanban, tone: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" },
+  TASK_UNBLOCKED: { icon: Unlock, tone: "bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300" },
+  MILESTONE_REACHED: { icon: Flag, tone: "bg-lime-100 text-lime-700 dark:bg-lime-500/15 dark:text-lime-300" },
 };
 
 export function NotificationList({
   notifications,
   filter,
   unreadCount,
+  taskHref = "/tasks",
+  projectHref = "/projects",
 }: {
   notifications: Notification[];
   filter: "all" | "unread";
   unreadCount: number;
+  /** Base path for task links (members use /my-tasks). */
+  taskHref?: string;
+  /** Base path for project links (members use /my-projects). */
+  projectHref?: string;
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -166,13 +181,24 @@ export function NotificationList({
                   <p className="mt-0.5 text-sm text-muted-foreground">{n.message}</p>
                   {n.task && (
                     <Link
-                      href={`/tasks/${n.task.id}`}
+                      href={`${taskHref}/${n.task.id}`}
                       onClick={() => {
                         if (!n.isRead) void markNotificationRead(n.id, true);
                       }}
                       className="mt-1 inline-block text-xs font-medium text-primary hover:underline"
                     >
                       Open task →
+                    </Link>
+                  )}
+                  {!n.task && n.project && (
+                    <Link
+                      href={`${projectHref}/${n.project.id}`}
+                      onClick={() => {
+                        if (!n.isRead) void markNotificationRead(n.id, true);
+                      }}
+                      className="mt-1 inline-block text-xs font-medium text-primary hover:underline"
+                    >
+                      Open project →
                     </Link>
                   )}
                   {n.type === "FILE_SHARED" && (

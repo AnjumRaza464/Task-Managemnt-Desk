@@ -12,6 +12,7 @@ export async function getNotifications(userId: string, filter: "all" | "unread" 
     take: 100,
     include: {
       task: { select: { id: true, title: true } },
+      project: { select: { id: true, name: true } },
     },
   });
 }

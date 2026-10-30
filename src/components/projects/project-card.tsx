@@ -6,11 +6,11 @@ import { ProjectStatusBadge } from "@/components/projects/project-status-badge";
 import { cn, formatDate } from "@/lib/utils";
 import type { ProjectCard as ProjectCardData } from "@/lib/queries/projects";
 
-export function ProjectCard({ project, href }: { project: ProjectCardData; href: string }) {
+export function ProjectCard({ project, href, className }: { project: ProjectCardData; href: string; className?: string }) {
   const s = project.stats;
   const members = project.members.map((m) => ({ user: m.user }));
   return (
-    <Card className="group relative gap-3 overflow-hidden py-4 transition-colors hover:bg-accent/30">
+    <Card className={cn("group relative gap-3 overflow-hidden py-4 transition-colors hover:bg-accent/30", className)}>
       <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: project.color }} />
       <CardContent className="space-y-2">
         <div className="flex items-start justify-between gap-2">

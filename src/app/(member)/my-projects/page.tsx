@@ -38,8 +38,8 @@ export default async function MyProjectsPage() {
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {ws.projects.map((p) => (
                   <div key={p.id} className="relative">
-                    <ProjectCard project={p} href={`/my-projects/${p.id}`} />
-                    <ProjectRoleBadge role={p.myRole} className="absolute right-3 bottom-3" />
+                    <ProjectCard project={p} href={`/my-projects/${p.id}`} className="h-full pt-9" />
+                    <ProjectRoleBadge role={p.myRole} className="absolute top-3 right-3" />
                   </div>
                 ))}
               </div>

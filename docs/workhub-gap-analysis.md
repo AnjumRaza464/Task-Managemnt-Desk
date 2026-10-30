@@ -89,3 +89,31 @@ Missing and blocking the brief: the **Workspace → Project → List** hierarchy
 Key design constraint: `MonthlyPlan` is unique per (user, year, month) and every task belongs to exactly one plan
 of exactly one assignee. Multi-assignee tasks cannot be represented in that model, so the hierarchy decision
 (replace vs. sit alongside) has to be made before the data model changes.
+
+## Status after implementation (2026-10-30)
+
+Decision: the Workspace → Project → List hierarchy sits **alongside** the per-user `MonthlyPlan`
+(the user chose "keep both"). A task always lives in the primary assignee's monthly plan and may
+additionally belong to a project, a list and a milestone.
+
+| Brief feature | Now | Where |
+|---|---|---|
+| Workspaces / projects / lists | Implemented | `Workspace`, `Project`, `List` models; `src/actions/workspaces.ts`, `src/actions/projects.ts`, `src/actions/lists.ts`; `/workspaces`, `/projects/[id]`, `/my-projects` |
+| Move tasks between lists | Implemented | drag on the project board, "Move to list" menu; `moveTaskToList` in `src/actions/lists.ts` |
+| Multiple assignees per task | Implemented | `TaskAssignee`; `src/lib/assignees.ts`; `UserMultiSelect`; every list/board/report uses the full list |
+| Replies / threads | Implemented | `Comment.parentId` (one level), `src/components/tasks/comment-section.tsx` |
+| @mentions + notifications | Implemented | `CommentMention`, `MENTIONED` notifications, `src/components/tasks/mention-composer.tsx` |
+| Project discussions | Implemented | Discussion tab, `Comment.projectId` |
+| Members comment on their tasks | Implemented | `addComment` checks task / project access |
+| Add members to projects, per-project roles | Implemented | `ProjectMember` (OWNER / MANAGER / MEMBER / VIEWER), `src/lib/permissions.ts`, Members tab |
+| Role-based access | Implemented | `getProjectAccess` / `getTaskAccess`; member pages honour project roles |
+| Milestones | Implemented | `Milestone`, `src/actions/milestones.ts`, auto-reached when all tasks are done |
+| Task dependencies | Implemented | `TaskDependency`, `src/actions/dependencies.ts`; blocked tasks cannot complete; unblock notifications |
+| Project timeline | Implemented | Gantt-style Timeline tab, `src/components/projects/project-timeline.tsx` |
+| Notifications for members | Implemented | `/my-notifications` |
+| Workflow automation | Partial | built-in rules only (overdue, 100 % ⇒ completed, recurrence, milestone auto-close, unblock); no user-defined rules |
+| Email / reminders outside the app | Not done | removed on purpose earlier; in-app only |
+
+Still open / ideas: user-defined automation rules, project templates, per-project file library
+(attachments are per task, shared files are global), task reordering inside a list by drag
+(position is kept, drop appends to the end), browser verification of the new screens.

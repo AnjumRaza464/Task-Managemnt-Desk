@@ -6,14 +6,18 @@ const { auth } = NextAuth(authConfig);
 
 const PUBLIC_PATHS = ["/login"];
 const MEMBER_PREFIX = "/my-tasks";
-const MEMBER_PREFIXES = ["/my-tasks", "/my-files"];
+const MEMBER_PREFIXES = ["/my-tasks", "/my-files", "/my-projects", "/my-notifications"];
 const isMemberPath = (pathname: string) => MEMBER_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
 /** Manager URLs that have a member-area twin, so shared links still land somewhere useful. */
 function memberEquivalent(pathname: string): string {
   const task = pathname.match(/^\/tasks\/([^/]+)$/);
   if (task && task[1] !== "kanban") return `/my-tasks/${task[1]}`;
+  const project = pathname.match(/^\/projects\/([^/]+)$/);
+  if (project) return `/my-projects/${project[1]}`;
+  if (pathname === "/workspaces") return "/my-projects";
   if (pathname === "/files") return "/my-files";
+  if (pathname === "/notifications") return "/my-notifications";
   return MEMBER_PREFIX;
 }
 
@@ -40,7 +44,7 @@ export default auth((req) => {
     return NextResponse.redirect(new URL(home, nextUrl));
   }
 
-  // Members may only use their own read-only area (and API routes, which check ownership themselves).
+  // Members may only use their own area (and API routes, which check access themselves).
   if (isMember && !isMemberPath(pathname) && !isApi) {
     return NextResponse.redirect(new URL(memberEquivalent(pathname), nextUrl));
   }

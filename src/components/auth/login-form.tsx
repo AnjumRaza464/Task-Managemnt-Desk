@@ -23,6 +23,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
           autoComplete="username"
           placeholder="you@company.com"
           required
+          className="h-11 rounded-xl border-white/15 bg-white/5 px-3.5 focus-visible:border-primary/60"
         />
       </div>
 
@@ -35,6 +36,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
           autoComplete="current-password"
           placeholder="••••••••"
           required
+          className="h-11 rounded-xl border-white/15 bg-white/5 px-3.5 focus-visible:border-primary/60"
         />
       </div>
 
@@ -48,7 +50,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
         </div>
       )}
 
-      <Button type="submit" className="w-full" disabled={pending}>
+      <Button type="submit" size="lg" className="h-11 w-full rounded-xl text-base shadow-[0_10px_30px_-10px_rgba(240,43,155,0.8)]" disabled={pending}>
         {pending && <Loader2 className="animate-spin" />}
         Sign in
       </Button>

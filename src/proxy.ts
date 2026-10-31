@@ -4,7 +4,7 @@ import { authConfig } from "@/auth.config";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/offline", "/manifest.webmanifest"];
 const MEMBER_PREFIX = "/my-tasks";
 const MEMBER_PREFIXES = ["/my-tasks", "/my-files", "/my-projects", "/my-notifications"];
 const isMemberPath = (pathname: string) => MEMBER_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
@@ -40,6 +40,7 @@ export default auth((req) => {
   const isMember = user?.role === "MEMBER";
   const home = isMember ? MEMBER_PREFIX : "/dashboard";
 
+  if (pathname === "/offline" || pathname === "/manifest.webmanifest") return NextResponse.next();
   if (isPublic || pathname === "/") {
     return NextResponse.redirect(new URL(home, nextUrl));
   }

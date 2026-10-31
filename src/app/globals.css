@@ -135,3 +135,10 @@
     @apply font-sans;
   }
 }
+/* Installed (PWA) mode: keep content clear of the notch and home indicator. */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

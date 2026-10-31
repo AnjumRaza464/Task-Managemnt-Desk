@@ -8,6 +8,7 @@ import { MemberNav } from "@/components/layout/member-nav";
 import { getUnseenFileCount } from "@/lib/queries/files";
 import { getUnreadNotificationCount } from "@/lib/queries/notifications";
 import { ChatWidget } from "@/components/chat/chat-widget";
+import { InstallBanner } from "@/components/pwa/install-banner";
 
 export default async function MemberLayout({ children }: LayoutProps<"/">) {
   const user = await requireMemberPage();
@@ -28,7 +29,10 @@ export default async function MemberLayout({ children }: LayoutProps<"/">) {
           </div>
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-6">{children}</main>
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-6">
+        <InstallBanner />
+        {children}
+      </main>
       <ChatWidget currentUser={user} />
     </div>
   );

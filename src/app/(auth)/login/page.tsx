@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Flag, FolderKanban, MessagesSquare, Users } from "lucide-react";
 import { LoginForm } from "@/components/auth/login-form";
 import { LoginSceneLoader } from "@/components/auth/login-scene-loader";
+import { InstallBanner } from "@/components/pwa/install-banner";
 import { APP_NAME } from "@/lib/constants";
 import { BrandLogo } from "@/components/shared/brand-logo";
 
@@ -87,6 +88,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
                 Managers plan and assign work · team members see their own tasks and projects.
               </p>
             </div>
+            <InstallBanner className="mt-4" />
           </section>
         </main>
 

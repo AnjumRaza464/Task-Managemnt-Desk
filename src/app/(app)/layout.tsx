@@ -4,6 +4,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
 import { ChatWidget } from "@/components/chat/chat-widget";
+import { InstallBanner } from "@/components/pwa/install-banner";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const manager = await requireManagerPage();
@@ -14,7 +15,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <AppSidebar user={manager} unreadCount={unreadCount} />
       <SidebarInset>
         <AppHeader unreadCount={unreadCount} />
-        <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">{children}</div>
+        <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+          <InstallBanner />
+          {children}
+        </div>
       </SidebarInset>
       <ChatWidget currentUser={manager} />
     </SidebarProvider>

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { getTaskMessages, postTaskMessage, type TaskMessage, type TaskMessageAttachment } from "@/actions/task-messages";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { MentionComposer, mentionedIds, renderWithMentions, type MentionUser } from "@/components/tasks/mention-composer";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
 import { cn, formatBytes, formatDateTime, getInitials, timeAgo } from "@/lib/utils";
@@ -41,10 +42,35 @@ export function AttachmentChip({ file, mine = false }: { file: TaskMessageAttach
   );
 }
 
+/** Picked-file chip shown above a composer. */
+function PendingFile({ file, onClear }: { file: File; onClear: () => void }) {
+  return (
+    <div className="mb-2 flex items-center gap-2 rounded-lg border bg-muted/40 px-2 py-1 text-xs">
+      {file.type.startsWith("image/") ? <ImageIcon className="size-3.5" /> : <Paperclip className="size-3.5" />}
+      <span className="truncate">{file.name}</span>
+      <span className="text-muted-foreground">{formatBytes(file.size)}</span>
+      <button type="button" className="ml-auto" aria-label="Remove file" onClick={onClear}>
+        <X className="size-3" />
+      </button>
+    </div>
+  );
+}
+
+function pickFile(e: React.ChangeEvent<HTMLInputElement>, set: (f: File | null) => void) {
+  const f = e.target.files?.[0] ?? null;
+  if (f && f.size > MAX_ATTACHMENT_BYTES) {
+    toast.error("File is larger than 5 MB.");
+    e.target.value = "";
+    return;
+  }
+  set(f);
+}
+
 /**
- * Right-hand pane of the task modal: a chat (quick messages) and a discussion
- * (threaded comments) with @mentions and file attachments. Messages are on
- * top; the Chat / Discussion switch sits in the composer at the bottom.
+ * Right-hand pane of the task modal.
+ * Chat: simple messages, straight into the stream.
+ * Discussion: topics (title + details) with threaded replies.
+ * The Chat / Discussion switch sits at the bottom next to the composer.
  */
 export function TaskConversation({
   taskId,
@@ -64,11 +90,17 @@ export function TaskConversation({
     CHAT: { messages: [], since: null, loaded: false },
     DISCUSSION: { messages: [], since: null, loaded: false },
   });
+  // chat composer / topic composer
   const [content, setContent] = useState("");
+  const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [replyTo, setReplyTo] = useState<TaskMessage | null>(null);
+  // reply composer (discussion)
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replyFile, setReplyFile] = useState<File | null>(null);
   const [sending, startSend] = useTransition();
   const fileInput = useRef<HTMLInputElement>(null);
+  const replyFileInput = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const current = store[kind];
 
@@ -100,33 +132,23 @@ export function TaskConversation({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, kind]);
 
-  // Keep the newest message in view.
+  // Chat: keep the newest message in view.
   const count = current.messages.length;
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && kind === "CHAT") el.scrollTop = el.scrollHeight;
   }, [count, kind]);
 
-  function chooseFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] ?? null;
-    if (f && f.size > MAX_ATTACHMENT_BYTES) {
-      toast.error("File is larger than 5 MB.");
-      e.target.value = "";
-      return;
-    }
-    setFile(f);
-  }
-
-  function send() {
-    const text = content.trim();
-    if (!text && !file) return;
+  function submit(fields: { title?: string; content: string; parentId?: string; file: File | null }, after: () => void) {
+    const text = fields.content.trim();
     const fd = new FormData();
     fd.set("taskId", taskId);
     fd.set("kind", kind);
     fd.set("content", text);
     fd.set("mentionIds", JSON.stringify(mentionedIds(text, users)));
-    if (replyTo) fd.set("parentId", replyTo.id);
-    if (file) fd.set("file", file);
+    if (fields.title) fd.set("title", fields.title.trim());
+    if (fields.parentId) fd.set("parentId", fields.parentId);
+    if (fields.file) fd.set("file", fields.file);
     startSend(async () => {
       const result = await postTaskMessage(fd);
       if (!result.ok) {
@@ -135,23 +157,53 @@ export function TaskConversation({
       }
       const message = result.data;
       setStore((prev) => ({ ...prev, [kind]: { ...prev[kind], messages: [...prev[kind].messages, message] } }));
+      after();
+    });
+  }
+
+  function sendChat() {
+    if (!content.trim() && !file) return;
+    submit({ content, file }, () => {
       setContent("");
       setFile(null);
-      setReplyTo(null);
       if (fileInput.current) fileInput.current.value = "";
     });
   }
 
-  const messages = current.messages;
-  const threads = messages.filter((m) => !m.parentId);
-  const repliesOf = (id: string) => messages.filter((m) => m.parentId === id);
+  function startTopic() {
+    if (!title.trim()) {
+      toast.error("Give the discussion a topic title.");
+      return;
+    }
+    submit({ title, content, file }, () => {
+      setTitle("");
+      setContent("");
+      setFile(null);
+      if (fileInput.current) fileInput.current.value = "";
+      toast.success("Discussion started");
+    });
+  }
 
-  function bubble(m: TaskMessage, isReply = false) {
+  function sendReply(parentId: string) {
+    if (!replyText.trim() && !replyFile) return;
+    submit({ content: replyText, parentId, file: replyFile }, () => {
+      setReplyText("");
+      setReplyFile(null);
+      setReplyTo(null);
+      if (replyFileInput.current) replyFileInput.current.value = "";
+    });
+  }
+
+  const messages = current.messages;
+  const topLevel = messages.filter((m) => !m.parentId);
+  const repliesOf = (id: string) => messages.filter((m) => m.parentId === id);
+  const mentionUsersFor = (m: TaskMessage) => users.filter((u) => m.mentions.some((x) => x.userId === u.id) || m.content.includes(`@${u.name}`));
+
+  function chatBubble(m: TaskMessage) {
     const mine = m.author.id === currentUserId;
-    const mentionUsers = users.filter((u) => m.mentions.some((x) => x.userId === u.id) || m.content.includes(`@${u.name}`));
     return (
-      <div key={m.id} className={cn("flex gap-2", mine ? "flex-row-reverse" : "", isReply && "mt-2")}>
-        <Avatar className={cn("shrink-0", isReply ? "size-6" : "size-7")}>
+      <div key={m.id} className={cn("flex gap-2", mine && "flex-row-reverse")}>
+        <Avatar className="size-7 shrink-0">
           <AvatarFallback className="bg-primary/10 text-[10px] text-primary">{getInitials(m.author.name)}</AvatarFallback>
         </Avatar>
         <div className={cn("flex max-w-[85%] flex-col", mine ? "items-end" : "items-start")}>
@@ -159,57 +211,121 @@ export function TaskConversation({
             <span className="font-medium text-foreground">{mine ? "You" : m.author.name}</span>
             <span title={formatDateTime(m.createdAt)}>{timeAgo(m.createdAt)}</span>
           </div>
-          <div
-            className={cn(
-              "mt-0.5 rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap",
-              mine ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted",
-            )}
-          >
-            {m.content && <span>{renderWithMentions(m.content, mentionUsers, currentUserId)}</span>}
+          <div className={cn("mt-0.5 rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap", mine ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted")}>
+            {m.content && <span>{renderWithMentions(m.content, mentionUsersFor(m), currentUserId)}</span>}
             {m.attachments.map((f) => (
               <AttachmentChip key={f.id} file={f} mine={mine} />
             ))}
           </div>
-          {kind === "DISCUSSION" && !isReply && canPost && (
-            <button
-              type="button"
-              className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
-              onClick={() => setReplyTo(m)}
-            >
-              <CornerDownRight className="size-3" /> Reply
-            </button>
-          )}
         </div>
       </div>
     );
   }
 
+  function topicCard(m: TaskMessage) {
+    const replies = repliesOf(m.id);
+    const open = replyTo === m.id;
+    return (
+      <article key={m.id} className="rounded-xl border bg-card p-3">
+        <div className="flex items-start gap-2">
+          <Avatar className="size-7 shrink-0">
+            <AvatarFallback className="bg-primary/10 text-[10px] text-primary">{getInitials(m.author.name)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold leading-snug">{m.title || m.content || "Discussion"}</p>
+            <p className="text-[11px] text-muted-foreground">
+              {m.author.id === currentUserId ? "You" : m.author.name} · <span title={formatDateTime(m.createdAt)}>{timeAgo(m.createdAt)}</span>
+              {replies.length > 0 && ` · ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
+            </p>
+            {m.title && m.content && (
+              <p className="mt-1.5 whitespace-pre-wrap text-sm text-muted-foreground">{renderWithMentions(m.content, mentionUsersFor(m), currentUserId)}</p>
+            )}
+            {m.attachments.map((f) => (
+              <AttachmentChip key={f.id} file={f} />
+            ))}
+          </div>
+        </div>
+
+        {replies.length > 0 && (
+          <ul className="mt-3 space-y-3 border-l-2 pl-3">
+            {replies.map((r) => (
+              <li key={r.id} className="flex gap-2">
+                <Avatar className="size-6 shrink-0">
+                  <AvatarFallback className="bg-primary/10 text-[9px] text-primary">{getInitials(r.author.name)}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] text-muted-foreground">
+                    <span className="font-medium text-foreground">{r.author.id === currentUserId ? "You" : r.author.name}</span> ·{" "}
+                    <span title={formatDateTime(r.createdAt)}>{timeAgo(r.createdAt)}</span>
+                  </p>
+                  {r.content && <p className="whitespace-pre-wrap text-sm">{renderWithMentions(r.content, mentionUsersFor(r), currentUserId)}</p>}
+                  {r.attachments.map((f) => (
+                    <AttachmentChip key={f.id} file={f} />
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {canPost && (
+          <div className="mt-3">
+            {open ? (
+              <div className="space-y-2 rounded-lg bg-muted/40 p-2">
+                {replyFile && (
+                  <PendingFile
+                    file={replyFile}
+                    onClear={() => {
+                      setReplyFile(null);
+                      if (replyFileInput.current) replyFileInput.current.value = "";
+                    }}
+                  />
+                )}
+                <div className="flex items-end gap-2">
+                  <input ref={replyFileInput} type="file" className="hidden" onChange={(e) => pickFile(e, setReplyFile)} aria-label="Attach a file to the reply" />
+                  <Button type="button" size="icon-sm" variant="outline" aria-label="Attach file" onClick={() => replyFileInput.current?.click()}>
+                    <Paperclip />
+                  </Button>
+                  <MentionComposer value={replyText} onChange={setReplyText} users={users} rows={1} autoFocus placeholder="Write a reply… @ to mention" ariaLabel="Reply" onSubmit={() => sendReply(m.id)} className="min-w-0 flex-1" />
+                  <Button type="button" size="sm" onClick={() => sendReply(m.id)} disabled={sending || (!replyText.trim() && !replyFile)}>
+                    {sending ? <Loader2 className="animate-spin" /> : <Send />} Reply
+                  </Button>
+                  <Button type="button" size="icon-sm" variant="ghost" aria-label="Cancel reply" onClick={() => setReplyTo(null)}>
+                    <X />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => setReplyTo(m.id)}>
+                <CornerDownRight className="size-3" /> Reply
+              </button>
+            )}
+          </div>
+        )}
+      </article>
+    );
+  }
+
   return (
     <div className={cn("flex min-h-0 flex-col", className)}>
-      <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto p-4">
         {!current.loaded ? (
           <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" /> Loading…
           </p>
-        ) : threads.length === 0 ? (
+        ) : topLevel.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-sm text-muted-foreground">
             {kind === "CHAT" ? <MessageCircle className="size-6" /> : <MessagesSquare className="size-6" />}
-            {kind === "CHAT" ? "No messages yet. Start the conversation about this task." : "No discussion yet. Post an update, question or decision."}
+            {kind === "CHAT" ? "No messages yet. Start the conversation about this task." : "No discussions on this task yet."}
           </div>
+        ) : kind === "CHAT" ? (
+          topLevel.map(chatBubble)
         ) : (
-          threads.map((m) => (
-            <div key={m.id}>
-              {bubble(m)}
-              {kind === "DISCUSSION" && repliesOf(m.id).length > 0 && (
-                <div className="mt-1 ml-9 border-l-2 pl-3">{repliesOf(m.id).map((r) => bubble(r, true))}</div>
-              )}
-            </div>
-          ))
+          [...topLevel].reverse().map(topicCard)
         )}
       </div>
 
       <div className="border-t bg-background/80 p-3">
-        {/* Chat / Discussion switch lives at the bottom, next to the composer. */}
         <div className="mb-2 flex items-center gap-2">
           <div className="flex rounded-lg border p-0.5">
             {(["CHAT", "DISCUSSION"] as const).map((k) => (
@@ -225,68 +341,65 @@ export function TaskConversation({
               >
                 {k === "CHAT" ? <MessageCircle /> : <MessagesSquare />}
                 {k === "CHAT" ? "Chat" : "Discussion"}
-                {store[k].loaded && store[k].messages.length > 0 && (
-                  <span className={cn("text-[10px]", kind === k ? "opacity-80" : "text-muted-foreground")}>{store[k].messages.length}</span>
+                {store[k].loaded && store[k].messages.filter((m) => !m.parentId).length > 0 && (
+                  <span className={cn("text-[10px]", kind === k ? "opacity-80" : "text-muted-foreground")}>{store[k].messages.filter((m) => !m.parentId).length}</span>
                 )}
               </Button>
             ))}
           </div>
           <span className="hidden text-[11px] text-muted-foreground sm:inline">
-            {kind === "CHAT" ? "Quick messages with everyone on this task" : "Threaded updates kept with the task"}
+            {kind === "CHAT" ? "Quick messages with everyone on this task" : "Start a topic; people reply underneath"}
           </span>
         </div>
 
-        {canPost ? (
+        {!canPost ? (
+          <p className="text-xs text-muted-foreground">You can read this conversation but not post in it.</p>
+        ) : kind === "CHAT" ? (
           <>
-            {replyTo && (
-              <div className="mb-2 flex items-center gap-2 rounded-lg bg-muted/60 px-2 py-1 text-xs">
-                <CornerDownRight className="size-3" /> Replying to <span className="font-medium">{replyTo.author.name}</span>
-                <button type="button" className="ml-auto" aria-label="Cancel reply" onClick={() => setReplyTo(null)}>
-                  <X className="size-3" />
-                </button>
-              </div>
-            )}
             {file && (
-              <div className="mb-2 flex items-center gap-2 rounded-lg border bg-muted/40 px-2 py-1 text-xs">
-                {file.type.startsWith("image/") ? <ImageIcon className="size-3.5" /> : <Paperclip className="size-3.5" />}
-                <span className="truncate">{file.name}</span>
-                <span className="text-muted-foreground">{formatBytes(file.size)}</span>
-                <button
-                  type="button"
-                  className="ml-auto"
-                  aria-label="Remove file"
-                  onClick={() => {
-                    setFile(null);
-                    if (fileInput.current) fileInput.current.value = "";
-                  }}
-                >
-                  <X className="size-3" />
-                </button>
-              </div>
+              <PendingFile
+                file={file}
+                onClear={() => {
+                  setFile(null);
+                  if (fileInput.current) fileInput.current.value = "";
+                }}
+              />
             )}
             <div className="flex items-end gap-2">
-              <input ref={fileInput} type="file" className="hidden" onChange={chooseFile} aria-label="Attach a file" />
+              <input ref={fileInput} type="file" className="hidden" onChange={(e) => pickFile(e, setFile)} aria-label="Attach a file" />
               <Button type="button" size="icon" variant="outline" aria-label="Attach file" title="Attach a file (max 5 MB)" onClick={() => fileInput.current?.click()}>
                 <Paperclip />
               </Button>
-              <MentionComposer
-                value={content}
-                onChange={setContent}
-                users={users}
-                rows={kind === "CHAT" ? 1 : 2}
-                placeholder={kind === "CHAT" ? "Message about this task… @ to mention" : "Write an update… @ to mention"}
-                ariaLabel={kind === "CHAT" ? "Chat message" : "Discussion post"}
-                onSubmit={send}
-                className="min-w-0 flex-1"
-              />
-              <Button type="button" onClick={send} disabled={sending || (!content.trim() && !file)} aria-label="Send">
+              <MentionComposer value={content} onChange={setContent} users={users} rows={1} placeholder="Message about this task… @ to mention" ariaLabel="Chat message" onSubmit={sendChat} className="min-w-0 flex-1" />
+              <Button type="button" onClick={sendChat} disabled={sending || (!content.trim() && !file)} aria-label="Send">
                 {sending ? <Loader2 className="animate-spin" /> : <Send />} Send
               </Button>
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Enter + Ctrl to send · files up to 5 MB are saved with the task</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">Ctrl+Enter to send · files up to 5 MB are saved with the task</p>
           </>
         ) : (
-          <p className="text-xs text-muted-foreground">You can read this conversation but not post in it.</p>
+          <div className="space-y-2">
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New topic title" maxLength={160} aria-label="New topic title" />
+            <MentionComposer value={content} onChange={setContent} users={users} rows={2} placeholder="Details (optional) · @ to mention" ariaLabel="Discussion details" onSubmit={startTopic} />
+            {file && (
+              <PendingFile
+                file={file}
+                onClear={() => {
+                  setFile(null);
+                  if (fileInput.current) fileInput.current.value = "";
+                }}
+              />
+            )}
+            <div className="flex items-center gap-2">
+              <input ref={fileInput} type="file" className="hidden" onChange={(e) => pickFile(e, setFile)} aria-label="Attach a file" />
+              <Button type="button" size="sm" variant="outline" onClick={() => fileInput.current?.click()}>
+                <Paperclip /> Attach file
+              </Button>
+              <Button type="button" size="sm" className="ml-auto" onClick={startTopic} disabled={sending || !title.trim()}>
+                {sending ? <Loader2 className="animate-spin" /> : <MessagesSquare />} Start discussion
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -35,6 +35,8 @@ const ACTION_LABELS: Record<string, string> = {
   PASSWORD_CHANGED: "changed their password",
   TASK_MOVED: "moved the task to another list",
   CHAT_MESSAGE: "sent a message in the task chat",
+  TIMER_STARTED: "started the timer",
+  TIMER_STOPPED: "stopped the timer",
   TASK_RECURRED: "scheduled the next occurrence",
   WORKSPACE_CREATED: "created a workspace",
   WORKSPACE_UPDATED: "updated a workspace",
@@ -118,6 +120,10 @@ export function activityDetail(action: string, raw: unknown): string {
     case "DEPENDENCY_ADDED":
     case "DEPENDENCY_REMOVED":
       return typeof details.blocker === "string" ? `waits for "${details.blocker}"` : "";
+    case "TIMER_STOPPED": {
+      const s = typeof details.seconds === "number" ? details.seconds : 0;
+      return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m logged`;
+    }
     case "ATTACHMENT_ADDED":
     case "ATTACHMENT_DELETED":
     case "FILE_SHARED":

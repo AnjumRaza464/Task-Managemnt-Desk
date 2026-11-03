@@ -115,6 +115,7 @@ model User {
   projectMembers   ProjectMember[]       @relation("ProjectMemberUser")
   membersAdded     ProjectMember[]       @relation("ProjectMemberBy")
   mentions         CommentMention[]
+  timeEntries      TimeEntry[]
 
   @@index([role, isActive])
 }
@@ -328,6 +329,7 @@ model Task {
   assignees          TaskAssignee[]
   blockedBy          TaskDependency[] @relation("Blocked")
   blocks             TaskDependency[] @relation("Blocker")
+  timeEntries        TimeEntry[]
 
   @@index([assigneeId, status])
   @@index([planId])
@@ -361,6 +363,8 @@ model Comment {
   parentId  String?
   authorId  String
   kind      CommentKind @default(DISCUSSION)
+  /// Topic title for a top-level discussion (null for chat messages and replies).
+  title     String?
   content   String
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -410,6 +414,24 @@ model Attachment {
 
   @@index([taskId])
   @@index([commentId])
+}
+
+/// Time a person spent on a task: one row per Start -> Stop of the timer.
+model TimeEntry {
+  id        String    @id @default(cuid())
+  taskId    String
+  userId    String
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+  /// Filled in when the timer stops.
+  seconds   Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId, endedAt])
 }
 
 model ActivityLog {

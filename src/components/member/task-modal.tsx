@@ -15,6 +15,7 @@ import { AssigneeAvatars } from "@/components/shared/assignee-avatars";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { MyTaskControls } from "@/components/member/my-task-controls";
 import { TaskConversation } from "@/components/member/task-conversation";
+import { TimeTracker } from "@/components/member/time-tracker";
 import type { MentionUser } from "@/components/tasks/mention-composer";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
 import { cn, formatBytes, formatDate } from "@/lib/utils";
@@ -233,6 +234,11 @@ export function TaskModal({
                     <MyTaskControls task={{ id: task.id, status: task.status, completion: task.completion }} />
                   </section>
                 )}
+
+                <section className="rounded-xl border p-4">
+                  <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Time tracking</p>
+                  <TimeTracker taskId={task.id} canTrack={task.access.canUpdateProgress} />
+                </section>
 
                 <section className="space-y-2">
                   <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">

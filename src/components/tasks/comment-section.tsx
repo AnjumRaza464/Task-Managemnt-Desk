@@ -14,6 +14,7 @@ import { cn, formatDateTime, getInitials, timeAgo } from "@/lib/utils";
 
 export type CommentNode = {
   id: string;
+  title?: string | null;
   content: string;
   createdAt: Date;
   author: { id: string; name: string };
@@ -118,6 +119,7 @@ export function CommentSection({
               )}
             </span>
           </div>
+          {c.title && <p className="text-sm font-semibold">{c.title}</p>}
           <p className="whitespace-pre-wrap text-sm">{renderWithMentions(c.content, mentionUsers, currentUserId)}</p>
           {c.attachments?.map((f) => (
             <AttachmentChip key={f.id} file={f} />

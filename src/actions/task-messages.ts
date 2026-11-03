@@ -16,6 +16,7 @@ const messageSchema = z.object({
   taskId: z.string().min(1),
   kind: KIND.default("CHAT"),
   parentId: z.string().min(1).optional(),
+  title: z.string().trim().max(160).optional(),
   content: z.string().trim().max(2000),
   mentionIds: z.array(z.string().min(1)).max(25).default([]),
 });
@@ -25,6 +26,7 @@ export type TaskMessage = {
   id: string;
   kind: CommentKind;
   parentId: string | null;
+  title: string | null;
   content: string;
   createdAt: string;
   author: { id: string; name: string };
@@ -42,6 +44,7 @@ type Row = {
   id: string;
   kind: CommentKind;
   parentId: string | null;
+  title: string | null;
   content: string;
   createdAt: Date;
   author: { id: string; name: string };
@@ -61,12 +64,15 @@ export async function postTaskMessage(formData: FormData) {
       taskId: formData.get("taskId"),
       kind: formData.get("kind") ?? "CHAT",
       parentId: formData.get("parentId") || undefined,
+      title: formData.get("title") ? String(formData.get("title")) : undefined,
       content: String(formData.get("content") ?? ""),
       mentionIds: JSON.parse(String(formData.get("mentionIds") ?? "[]")),
     });
     const file = formData.get("file");
     const hasFile = file instanceof File && file.size > 0;
-    if (!values.content && !hasFile) throw new ActionError("Write a message or attach a file.");
+    const isTopic = values.kind === "DISCUSSION" && !values.parentId;
+    if (isTopic && !values.title) throw new ActionError("Give the discussion a topic title.");
+    if (!isTopic && !values.content && !hasFile) throw new ActionError("Write a message or attach a file.");
     if (hasFile) {
       if (file.size > MAX_ATTACHMENT_BYTES) throw new ActionError("File is larger than 5 MB.");
       if (BLOCKED_EXTENSIONS.test(file.name)) throw new ActionError("This file type is not allowed.");
@@ -93,7 +99,7 @@ export async function postTaskMessage(formData: FormData) {
       ? await prisma.user.findMany({ where: { id: { in: mentionIds }, isActive: true }, select: { id: true, name: true } })
       : [];
     const bytes = hasFile ? Buffer.from(await file.arrayBuffer()) : null;
-    const label = hasFile && !values.content ? `📎 ${file.name}` : values.content;
+    const label = isTopic ? values.title! : hasFile && !values.content ? `📎 ${file.name}` : values.content;
     const excerpt = label.slice(0, 80);
 
     const message = await prisma.$transaction(async (tx) => {
@@ -102,6 +108,7 @@ export async function postTaskMessage(formData: FormData) {
           taskId: task.id,
           parentId,
           kind: values.kind,
+          title: isTopic ? values.title : null,
           authorId: user.id,
           content: values.content,
           mentions: { create: mentioned.map((m) => ({ userId: m.id })) },
@@ -176,7 +183,7 @@ export async function postTaskMessage(formData: FormData) {
         );
       } else {
         const assigneeTargets = await notifyUsers(
-          { userIds: task.assignees.map((a) => a.userId), type: "COMMENT_ADDED", title: "New comment on your task", message: `${user.name} commented on ${where}.`, taskId: task.id, excludeUserIds: [...notified] },
+          { userIds: task.assignees.map((a) => a.userId), type: "COMMENT_ADDED", title: isTopic ? "New discussion on your task" : "New comment on your task", message: isTopic ? `${user.name} started "${values.title}" on ${where}.` : `${user.name} commented on ${where}.`, taskId: task.id, excludeUserIds: [...notified] },
           tx,
         );
         for (const id of assigneeTargets) notified.add(id);

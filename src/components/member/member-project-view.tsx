@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, GanttChart, KanbanSquare, LayoutList, Lock, PieChart, Search } from "lucide-react";
+import { CalendarDays, GanttChart, KanbanSquare, LayoutList, Lock, MessagesSquare, PieChart, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,13 +13,15 @@ import { ProjectCalendar } from "@/components/member/project-calendar";
 import { TaskModal } from "@/components/member/task-modal";
 import { ProjectStatusBadge } from "@/components/projects/project-status-badge";
 import { ProjectTimeline } from "@/components/projects/project-timeline";
+import { CommentSection } from "@/components/tasks/comment-section";
+import { formatDuration } from "@/components/member/time-tracker";
 import type { MentionUser } from "@/components/tasks/mention-composer";
 import { useQueryState } from "@/hooks/use-query-state";
 import { PRIORITY_COLORS, STATUS_COLORS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import type { ProjectDetail, ProjectTask } from "@/lib/queries/projects";
 
-type View = "board" | "list" | "timeline" | "calendar" | "overview";
+type View = "board" | "list" | "timeline" | "calendar" | "overview" | "discussions";
 
 const VIEWS: { key: View; label: string; icon: LucideIcon }[] = [
   { key: "board", label: "Board", icon: KanbanSquare },
@@ -27,6 +29,7 @@ const VIEWS: { key: View; label: string; icon: LucideIcon }[] = [
   { key: "timeline", label: "Timeline", icon: GanttChart },
   { key: "calendar", label: "Calendar", icon: CalendarDays },
   { key: "overview", label: "Overview", icon: PieChart },
+  { key: "discussions", label: "Discussions", icon: MessagesSquare },
 ];
 
 /**
@@ -43,7 +46,7 @@ export function MemberProjectView({
   currentUserId: string;
   users: MentionUser[];
 }) {
-  const { project, stats } = data;
+  const { project, access, stats } = data;
   const { get, set } = useQueryState();
   const view = (VIEWS.some((v) => v.key === get("tab")) ? get("tab") : "board") as View;
   const [query, setQuery] = useState("");
@@ -197,6 +200,19 @@ export function MemberProjectView({
 
       {view === "overview" && <Overview data={data} tasks={tasks} currentUserId={currentUserId} />}
 
+      {view === "discussions" && (
+        <CommentSection
+          target={{ projectId: project.id }}
+          comments={project.comments}
+          currentUserId={currentUserId}
+          users={users}
+          canComment={access.canComment}
+          canModerate={access.canManage}
+          title="Project discussion"
+          description="Announcements, questions and decisions for the whole project. Use @ to mention someone."
+        />
+      )}
+
       <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && setOpenTaskId(null)} users={users} taskHref="/my-tasks" />
       {/* keep stats referenced for the overview tab */}
       <span className="hidden">{stats.total}</span>
@@ -240,6 +256,8 @@ function Overview({ data, tasks, currentUserId }: { data: ProjectDetail; tasks: 
     .sort((a, b) => b.count - a.count);
   const maxLoad = Math.max(1, ...workload.map((w) => w.count));
   const milestonesDone = project.milestones.filter((m) => m.completedAt).length;
+  // Finished timers only; a running timer is added once it stops.
+  const loggedSeconds = tasks.reduce((sum, t) => sum + t.timeEntries.reduce((s, e) => s + (e.endedAt ? e.seconds : 0), 0), 0);
 
   const card = (label: string, value: React.ReactNode, hint: string, tone = "") => (
     <div className="rounded-xl border bg-card p-5">
@@ -254,8 +272,8 @@ function Overview({ data, tasks, currentUserId }: { data: ProjectDetail; tasks: 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {card("Progress", `${progress}%`, `${done} of ${total} tasks done`)}
         {card("Overdue", overdue, "tasks past due date", overdue > 0 ? "text-rose-600 dark:text-rose-400" : "")}
+        {card("Time logged", formatDuration(loggedSeconds).replace(/ \d\ds$/, ""), "across all tasks")}
         {card("Milestones", `${milestonesDone}/${project.milestones.length}`, "reached")}
-        {card("Members", project.members.length, "on this project")}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border bg-card p-5">

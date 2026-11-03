@@ -1,5 +1,4 @@
 import { requireMemberPage } from "@/lib/auth-guard";
-import { getUnseenFileCount } from "@/lib/queries/files";
 import { getUnreadNotificationCount } from "@/lib/queries/notifications";
 import { getMyProjects } from "@/lib/queries/projects";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -10,11 +9,7 @@ import { InstallBanner } from "@/components/pwa/install-banner";
 
 export default async function MemberLayout({ children }: LayoutProps<"/">) {
   const user = await requireMemberPage();
-  const [unseenFiles, unreadNotifications, projects] = await Promise.all([
-    getUnseenFileCount(user.id),
-    getUnreadNotificationCount(user.id),
-    getMyProjects(user.id),
-  ]);
+  const [unreadNotifications, projects] = await Promise.all([getUnreadNotificationCount(user.id), getMyProjects(user.id)]);
 
   const workspaces: SidebarWorkspace[] = [];
   const names: Record<string, string> = {};
@@ -30,7 +25,7 @@ export default async function MemberLayout({ children }: LayoutProps<"/">) {
 
   return (
     <SidebarProvider>
-      <MemberSidebar user={user} workspaces={workspaces} unreadNotifications={unreadNotifications} unseenFiles={unseenFiles} />
+      <MemberSidebar user={user} workspaces={workspaces} />
       <SidebarInset>
         <MemberHeader unreadCount={unreadNotifications} projectNames={names} />
         <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">

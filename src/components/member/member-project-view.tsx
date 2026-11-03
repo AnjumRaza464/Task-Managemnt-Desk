@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, GanttChart, KanbanSquare, LayoutList, Lock, MessagesSquare, PieChart, Search } from "lucide-react";
+import { CalendarDays, GanttChart, KanbanSquare, LayoutList, Lock, PieChart, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,14 +13,13 @@ import { ProjectCalendar } from "@/components/member/project-calendar";
 import { TaskModal } from "@/components/member/task-modal";
 import { ProjectStatusBadge } from "@/components/projects/project-status-badge";
 import { ProjectTimeline } from "@/components/projects/project-timeline";
-import { CommentSection } from "@/components/tasks/comment-section";
 import type { MentionUser } from "@/components/tasks/mention-composer";
 import { useQueryState } from "@/hooks/use-query-state";
 import { PRIORITY_COLORS, STATUS_COLORS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import type { ProjectDetail, ProjectTask } from "@/lib/queries/projects";
 
-type View = "board" | "list" | "timeline" | "calendar" | "overview" | "discussions";
+type View = "board" | "list" | "timeline" | "calendar" | "overview";
 
 const VIEWS: { key: View; label: string; icon: LucideIcon }[] = [
   { key: "board", label: "Board", icon: KanbanSquare },
@@ -28,12 +27,11 @@ const VIEWS: { key: View; label: string; icon: LucideIcon }[] = [
   { key: "timeline", label: "Timeline", icon: GanttChart },
   { key: "calendar", label: "Calendar", icon: CalendarDays },
   { key: "overview", label: "Overview", icon: PieChart },
-  { key: "discussions", label: "Discussions", icon: MessagesSquare },
 ];
 
 /**
  * The member's project workspace: Board / List / Timeline / Calendar /
- * Overview / Discussions, with task search and an assignee filter. Tasks
+ * Overview, with task search and an assignee filter. Tasks
  * open in a modal with the chat on the right; members only view them.
  */
 export function MemberProjectView({
@@ -45,7 +43,7 @@ export function MemberProjectView({
   currentUserId: string;
   users: MentionUser[];
 }) {
-  const { project, access, stats } = data;
+  const { project, stats } = data;
   const { get, set } = useQueryState();
   const view = (VIEWS.some((v) => v.key === get("tab")) ? get("tab") : "board") as View;
   const [query, setQuery] = useState("");
@@ -105,9 +103,6 @@ export function MemberProjectView({
                   )}
                 >
                   <v.icon className="size-4" /> {v.label}
-                  {v.key === "discussions" && project.comments.length > 0 && (
-                    <span className={cn("text-xs", active ? "opacity-80" : "text-muted-foreground")}>{project.comments.length}</span>
-                  )}
                 </button>
               );
             })}
@@ -201,19 +196,6 @@ export function MemberProjectView({
       {view === "calendar" && <ProjectCalendar tasks={tasks} onOpen={setOpenTaskId} />}
 
       {view === "overview" && <Overview data={data} tasks={tasks} currentUserId={currentUserId} />}
-
-      {view === "discussions" && (
-        <CommentSection
-          target={{ projectId: project.id }}
-          comments={project.comments}
-          currentUserId={currentUserId}
-          users={users}
-          canComment={access.canComment}
-          canModerate={access.canManage}
-          title="Project discussion"
-          description="Announcements, questions and decisions for the whole project. Use @ to mention someone."
-        />
-      )}
 
       <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && setOpenTaskId(null)} users={users} taskHref="/my-tasks" />
       {/* keep stats referenced for the overview tab */}

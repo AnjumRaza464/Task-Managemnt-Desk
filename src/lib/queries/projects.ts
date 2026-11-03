@@ -96,7 +96,7 @@ export async function getProjectForUser(id: string, user: CurrentUser) {
       },
       tasks: { include: projectTaskInclude, orderBy: [{ position: "asc" }, { dueDate: "asc" }] },
       comments: {
-        where: { parentId: null },
+        where: { parentId: null, kind: "DISCUSSION" },
         orderBy: { createdAt: "desc" },
         include: {
           author: { select: { id: true, name: true } },

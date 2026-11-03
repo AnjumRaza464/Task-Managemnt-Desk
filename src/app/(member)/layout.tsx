@@ -1,39 +1,44 @@
-import Link from "next/link";
 import { requireMemberPage } from "@/lib/auth-guard";
-import { APP_NAME } from "@/lib/constants";
-import { BrandLogo } from "@/components/shared/brand-logo";
-import { GlobalSearch } from "@/components/layout/global-search";
-import { MemberHeaderActions } from "@/components/layout/member-header-actions";
-import { MemberNav } from "@/components/layout/member-nav";
 import { getUnseenFileCount } from "@/lib/queries/files";
 import { getUnreadNotificationCount } from "@/lib/queries/notifications";
+import { getMyProjects } from "@/lib/queries/projects";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { MemberHeader } from "@/components/layout/member-header";
+import { MemberSidebar, type SidebarWorkspace } from "@/components/layout/member-sidebar";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { InstallBanner } from "@/components/pwa/install-banner";
 
 export default async function MemberLayout({ children }: LayoutProps<"/">) {
   const user = await requireMemberPage();
-  const [unseenFiles, unreadNotifications] = await Promise.all([getUnseenFileCount(user.id), getUnreadNotificationCount(user.id)]);
+  const [unseenFiles, unreadNotifications, projects] = await Promise.all([
+    getUnseenFileCount(user.id),
+    getUnreadNotificationCount(user.id),
+    getMyProjects(user.id),
+  ]);
+
+  const workspaces: SidebarWorkspace[] = [];
+  const names: Record<string, string> = {};
+  for (const p of projects) {
+    names[p.id] = p.name;
+    let ws = workspaces.find((w) => w.id === p.workspace.id);
+    if (!ws) {
+      ws = { id: p.workspace.id, name: p.workspace.name, color: p.workspace.color, projects: [] };
+      workspaces.push(ws);
+    }
+    ws.projects.push({ id: p.id, name: p.name, color: p.color, status: p.status, openTasks: p.stats.total - p.stats.completed });
+  }
 
   return (
-    <div className="flex min-h-svh flex-col">
-      <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
-          <Link href="/my-tasks" className="flex items-center gap-2 font-semibold">
-            <BrandLogo className="h-9" />
-            <span className="sr-only">{APP_NAME}</span>
-          </Link>
-          <MemberNav unseenFiles={unseenFiles} unreadNotifications={unreadNotifications} />
-          <div className="ml-auto flex items-center gap-1">
-            <GlobalSearch scope="member" />
-            <MemberHeaderActions user={user} />
-          </div>
+    <SidebarProvider>
+      <MemberSidebar user={user} workspaces={workspaces} unreadNotifications={unreadNotifications} unseenFiles={unseenFiles} />
+      <SidebarInset>
+        <MemberHeader unreadCount={unreadNotifications} projectNames={names} />
+        <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+          <InstallBanner />
+          {children}
         </div>
-      </header>
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-6">
-        <InstallBanner />
-        {children}
-      </main>
+      </SidebarInset>
       <ChatWidget currentUser={user} />
-    </div>
+    </SidebarProvider>
   );
 }

@@ -47,6 +47,14 @@ enum NotificationType {
   MILESTONE_REACHED
 }
 
+/**
+ * DISCUSSION = threaded comment; CHAT = quick message in the task chat.
+ */
+enum CommentKind {
+  DISCUSSION
+  CHAT
+}
+
 enum ProjectRole {
   OWNER
   MANAGER
@@ -347,25 +355,28 @@ model SubTask {
  * A comment on a task or a project discussion. Replies set `parentId`.
  */
 model Comment {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   taskId    String?
   projectId String?
   parentId  String?
   authorId  String
+  kind      CommentKind @default(DISCUSSION)
   content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
-  task     Task?            @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  project  Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parent   Comment?         @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  Comment[]        @relation("CommentReplies")
-  author   User             @relation(fields: [authorId], references: [id])
-  mentions CommentMention[]
+  task        Task?            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
+  project     Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent      Comment?         @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Comment[]        @relation("CommentReplies")
+  author      User             @relation(fields: [authorId], references: [id])
+  mentions    CommentMention[]
 
   @@index([taskId])
   @@index([projectId])
   @@index([parentId])
+  @@index([taskId, kind, createdAt])
 }
 
 model CommentMention {
@@ -383,16 +394,22 @@ model Attachment {
   id           String   @id @default(cuid())
   taskId       String
   uploadedById String
+  /**
+   * Set when the file was sent in the task chat / discussion.
+   */
+  commentId    String?
   fileName     String
   mimeType     String
   size         Int
   data         Bytes
   createdAt    DateTime @default(now())
 
-  task       Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  uploadedBy User @relation(fields: [uploadedById], references: [id])
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy User     @relation(fields: [uploadedById], references: [id])
+  comment    Comment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
 
   @@index([taskId])
+  @@index([commentId])
 }
 
 model ActivityLog {

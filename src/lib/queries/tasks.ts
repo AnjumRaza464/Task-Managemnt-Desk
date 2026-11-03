@@ -164,14 +164,19 @@ export async function getTaskById(id: string) {
       blocks: { select: { blocked: { select: { id: true, title: true, status: true, dueDate: true } } } },
       subtasks: { orderBy: { position: "asc" } },
       comments: {
-        where: { parentId: null },
+        where: { parentId: null, kind: "DISCUSSION" },
         orderBy: { createdAt: "desc" },
         include: {
           author: { select: { id: true, name: true } },
           mentions: { select: { userId: true } },
+          attachments: { select: { id: true, fileName: true, mimeType: true, size: true } },
           replies: {
             orderBy: { createdAt: "asc" },
-            include: { author: { select: { id: true, name: true } }, mentions: { select: { userId: true } } },
+            include: {
+              author: { select: { id: true, name: true } },
+              mentions: { select: { userId: true } },
+              attachments: { select: { id: true, fileName: true, mimeType: true, size: true } },
+            },
           },
         },
       },

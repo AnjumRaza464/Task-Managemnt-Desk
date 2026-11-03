@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MentionComposer, mentionedIds, renderWithMentions, type MentionUser } from "@/components/tasks/mention-composer";
+import { AttachmentChip } from "@/components/member/task-conversation";
 import { cn, formatDateTime, getInitials, timeAgo } from "@/lib/utils";
 
 export type CommentNode = {
@@ -17,6 +18,7 @@ export type CommentNode = {
   createdAt: Date;
   author: { id: string; name: string };
   mentions: { userId: string }[];
+  attachments?: { id: string; fileName: string; mimeType: string; size: number }[];
   replies?: CommentNode[];
 };
 
@@ -117,6 +119,9 @@ export function CommentSection({
             </span>
           </div>
           <p className="whitespace-pre-wrap text-sm">{renderWithMentions(c.content, mentionUsers, currentUserId)}</p>
+          {c.attachments?.map((f) => (
+            <AttachmentChip key={f.id} file={f} />
+          ))}
 
           {!isReply && (c.replies?.length ?? 0) > 0 && (
             <ul className="mt-2 border-l-2 pl-3">{c.replies!.map((r) => item(r, true))}</ul>

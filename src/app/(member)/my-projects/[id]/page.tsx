@@ -2,31 +2,18 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { syncOverdueTasks } from "@/lib/overdue";
-import { getProjectForUser, getWorkspaceOptions } from "@/lib/queries/projects";
-import { getTaskFormOptions } from "@/lib/queries/tasks";
+import { getProjectForUser } from "@/lib/queries/projects";
 import { getAssignableUsers } from "@/lib/queries/users";
-import { parseProjectTab, ProjectView } from "@/components/projects/project-view";
+import { MemberProjectView } from "@/components/member/member-project-view";
 
 export const metadata: Metadata = { title: "Project" };
 
-export default async function MemberProjectPage({ params, searchParams }: PageProps<"/my-projects/[id]">) {
+export default async function MemberProjectPage({ params }: PageProps<"/my-projects/[id]">) {
   const user = await requireMemberPage();
   await syncOverdueTasks();
-  const [{ id }, query] = await Promise.all([params, searchParams]);
-  const data = await getProjectForUser(id, user);
+  const { id } = await params;
+  const [data, users] = await Promise.all([getProjectForUser(id, user), getAssignableUsers()]);
   if (!data) notFound();
-  const [options, users, workspaces] = await Promise.all([getTaskFormOptions(user), getAssignableUsers(), getWorkspaceOptions()]);
 
-  return (
-    <ProjectView
-      data={data}
-      tab={parseProjectTab(query.tab)}
-      user={user}
-      options={options}
-      users={users}
-      workspaces={workspaces}
-      basePath="/my-projects"
-      taskHref="/my-tasks"
-    />
-  );
+  return <MemberProjectView data={data} currentUserId={user.id} users={users} />;
 }

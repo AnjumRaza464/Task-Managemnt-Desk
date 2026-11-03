@@ -34,6 +34,7 @@ const ACTION_LABELS: Record<string, string> = {
   PROFILE_UPDATED: "updated their profile",
   PASSWORD_CHANGED: "changed their password",
   TASK_MOVED: "moved the task to another list",
+  CHAT_MESSAGE: "sent a message in the task chat",
   TASK_RECURRED: "scheduled the next occurrence",
   WORKSPACE_CREATED: "created a workspace",
   WORKSPACE_UPDATED: "updated a workspace",
@@ -105,6 +106,7 @@ export function activityDetail(action: string, raw: unknown): string {
     }
     case "COMMENT_ADDED":
     case "COMMENT_REPLIED":
+    case "CHAT_MESSAGE":
       return typeof details.excerpt === "string" ? `"${details.excerpt}"` : "";
     case "TASK_MOVED":
     case "LIST_RENAMED":

@@ -21,9 +21,17 @@ import {
 } from "@/components/ui/sidebar";
 import { ROLE_LABELS } from "@/lib/constants";
 import { getInitials } from "@/lib/utils";
-import type { CurrentManager } from "@/lib/auth-guard";
+import type { CurrentUser } from "@/lib/auth-guard";
 
-export function UserMenu({ user }: { user: CurrentManager }) {
+export function UserMenu({
+  user,
+  settingsHref = "/settings",
+  notificationsHref = "/notifications",
+}: {
+  user: CurrentUser;
+  settingsHref?: string | null;
+  notificationsHref?: string;
+}) {
   const { isMobile } = useSidebar();
 
   return (
@@ -77,10 +85,12 @@ export function UserMenu({ user }: { user: CurrentManager }) {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem render={<Link href="/settings" />}>
-                <Settings /> Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem render={<Link href="/notifications" />}>
+              {settingsHref && (
+                <DropdownMenuItem render={<Link href={settingsHref} />}>
+                  <Settings /> Settings
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem render={<Link href={notificationsHref} />}>
                 <Bell /> Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>

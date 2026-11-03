@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ListTodo } from "lucide-react";
+import { Building2, FolderKanban, ListTodo } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,11 +12,14 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
 import { BrandLogo, BrandMark } from "@/components/shared/brand-logo";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -50,7 +53,7 @@ export function MemberSidebar({ user, workspaces }: { user: CurrentUser; workspa
       <SidebarContent>
         {workspaces.length === 0 ? (
           <SidebarGroup>
-            <SidebarGroupLabel>Projects</SidebarGroupLabel>
+            <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
             <SidebarGroupContent>
               <p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
                 You are not in any project yet.
@@ -58,37 +61,56 @@ export function MemberSidebar({ user, workspaces }: { user: CurrentUser; workspa
             </SidebarGroupContent>
           </SidebarGroup>
         ) : (
-          workspaces.map((ws) => (
-            <SidebarGroup key={ws.id}>
-              <SidebarGroupLabel className="gap-2">
-                <span className="size-2 rounded-full" style={{ backgroundColor: ws.color }} />
-                <span className="truncate">{ws.name}</span>
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {ws.projects.map((p) => (
-                    <SidebarMenuItem key={p.id}>
+          <SidebarGroup>
+            <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-3">
+                {workspaces.map((ws) => {
+                  const wsActive = ws.projects.some((p) => isActive(`/my-projects/${p.id}`));
+                  return (
+                    <SidebarMenuItem key={ws.id}>
+                      {/* Workspace header: a department / team that owns the projects below it. */}
                       <SidebarMenuButton
-                        isActive={isActive(`/my-projects/${p.id}`)}
-                        tooltip={p.name}
-                        render={<Link href={`/my-projects/${p.id}`} />}
+                        size="lg"
+                        tooltip={ws.name}
+                        className={cn("cursor-default rounded-lg border bg-sidebar-accent/40 hover:bg-sidebar-accent/60", wsActive && "border-primary/30")}
                       >
-                        <span className="flex size-4 items-center justify-center">
-                          <span className="size-2.5 rounded-sm" style={{ backgroundColor: p.color }} />
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-md text-white" style={{ backgroundColor: ws.color }}>
+                          <Building2 className="size-4" />
                         </span>
-                        <span className="truncate">{p.name}</span>
+                        <span className="grid flex-1 text-left leading-tight">
+                          <span className="truncate text-sm font-semibold">{ws.name}</span>
+                          <span className="truncate text-[11px] text-muted-foreground">
+                            Workspace · {ws.projects.length} project{ws.projects.length === 1 ? "" : "s"}
+                          </span>
+                        </span>
                       </SidebarMenuButton>
-                      {p.openTasks > 0 && (
-                        <SidebarMenuBadge className="text-muted-foreground">
-                          <ListTodo className="size-3" /> {p.openTasks}
-                        </SidebarMenuBadge>
-                      )}
+
+                      {/* Its projects, indented under a connector line. */}
+                      <SidebarMenuSub className="mt-1 gap-0.5 border-l-2" style={{ borderLeftColor: ws.color }}>
+                        {ws.projects.map((p) => {
+                          const active = isActive(`/my-projects/${p.id}`);
+                          return (
+                            <SidebarMenuSubItem key={p.id}>
+                              <SidebarMenuSubButton isActive={active} render={<Link href={`/my-projects/${p.id}`} />} className="h-8">
+                                <FolderKanban className="size-4" style={{ color: p.color }} />
+                                <span className="flex-1 truncate">{p.name}</span>
+                                {p.openTasks > 0 && (
+                                  <span className="ml-auto inline-flex shrink-0 items-center gap-0.5 text-[11px] text-muted-foreground">
+                                    <ListTodo className="size-3" /> {p.openTasks}
+                                  </span>
+                                )}
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
                     </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
       </SidebarContent>
 

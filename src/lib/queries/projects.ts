@@ -72,7 +72,6 @@ export const projectTaskInclude = {
   _count: { select: { subtasks: true, comments: true, attachments: true, blockedBy: true } },
   subtasks: { select: { isCompleted: true } },
   blockedBy: { select: { blocker: { select: { id: true, title: true, status: true } } } },
-  timeEntries: { select: { seconds: true, startedAt: true, endedAt: true } },
 } satisfies Prisma.TaskInclude;
 
 export type ProjectTask = Prisma.TaskGetPayload<{ include: typeof projectTaskInclude }>;

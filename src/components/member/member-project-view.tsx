@@ -14,7 +14,6 @@ import { TaskModal } from "@/components/member/task-modal";
 import { ProjectStatusBadge } from "@/components/projects/project-status-badge";
 import { ProjectTimeline } from "@/components/projects/project-timeline";
 import { CommentSection } from "@/components/tasks/comment-section";
-import { formatDuration } from "@/components/member/time-tracker";
 import type { MentionUser } from "@/components/tasks/mention-composer";
 import { useQueryState } from "@/hooks/use-query-state";
 import { PRIORITY_COLORS, STATUS_COLORS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
@@ -210,6 +209,7 @@ export function MemberProjectView({
           canModerate={access.canManage}
           title="Project discussion"
           description="Announcements, questions and decisions for the whole project. Use @ to mention someone."
+          layout="composer-bottom"
         />
       )}
 
@@ -256,8 +256,6 @@ function Overview({ data, tasks, currentUserId }: { data: ProjectDetail; tasks: 
     .sort((a, b) => b.count - a.count);
   const maxLoad = Math.max(1, ...workload.map((w) => w.count));
   const milestonesDone = project.milestones.filter((m) => m.completedAt).length;
-  // Finished timers only; a running timer is added once it stops.
-  const loggedSeconds = tasks.reduce((sum, t) => sum + t.timeEntries.reduce((s, e) => s + (e.endedAt ? e.seconds : 0), 0), 0);
 
   const card = (label: string, value: React.ReactNode, hint: string, tone = "") => (
     <div className="rounded-xl border bg-card p-5">
@@ -272,8 +270,8 @@ function Overview({ data, tasks, currentUserId }: { data: ProjectDetail; tasks: 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {card("Progress", `${progress}%`, `${done} of ${total} tasks done`)}
         {card("Overdue", overdue, "tasks past due date", overdue > 0 ? "text-rose-600 dark:text-rose-400" : "")}
-        {card("Time logged", formatDuration(loggedSeconds).replace(/ \d\ds$/, ""), "across all tasks")}
         {card("Milestones", `${milestonesDone}/${project.milestones.length}`, "reached")}
+        {card("Members", project.members.length, "on this project")}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border bg-card p-5">

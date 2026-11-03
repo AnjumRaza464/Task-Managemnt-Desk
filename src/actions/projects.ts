@@ -9,7 +9,7 @@ import { requireProjectAccess } from "@/lib/permissions";
 import { ensureProjectMembers, revalidateProjectViews as revalidateProject } from "@/lib/project-members";
 import { projectMemberSchema, projectSchema, removeMemberSchema } from "@/lib/validations/project";
 
-const DEFAULT_LISTS = ["To do", "In progress", "Done"];
+const DEFAULT_LISTS = ["To do", "In progress", "In review", "Done"];
 
 export async function createProject(input: unknown) {
   return runAction(async () => {

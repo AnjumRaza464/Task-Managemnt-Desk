@@ -194,6 +194,7 @@ export function ProjectView({
           canModerate={access.canManage}
           title="Project discussion"
           description="Announcements, questions and decisions for the whole project. Every member is notified of new posts; use @ to call someone in."
+          layout="composer-bottom"
         />
       )}
       {tab === "members" && (

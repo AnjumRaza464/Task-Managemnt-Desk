@@ -32,6 +32,7 @@ export function CommentSection({
   canModerate = false,
   title = "Comments",
   description,
+  layout = "composer-top",
 }: {
   target: { taskId: string } | { projectId: string };
   comments: CommentNode[];
@@ -43,6 +44,8 @@ export function CommentSection({
   canModerate?: boolean;
   title?: string;
   description?: string;
+  /** "composer-bottom": messages above (oldest first, newest at the bottom), typing bar below, like a chat. */
+  layout?: "composer-top" | "composer-bottom";
 }) {
   const router = useRouter();
   const [content, setContent] = useState("");
@@ -165,8 +168,15 @@ export function CommentSection({
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-4">
+        {layout === "composer-bottom" &&
+          (comments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No messages yet. Start the discussion below.</p>
+          ) : (
+            <ul className="space-y-4">{[...comments].reverse().map((c) => item(c, false))}</ul>
+          ))}
+
         {canComment && (
-          <div className="space-y-2">
+          <div className={cn("space-y-2", layout === "composer-bottom" && "border-t pt-4")}>
             <MentionComposer
               value={content}
               onChange={setContent}
@@ -184,11 +194,12 @@ export function CommentSection({
           </div>
         )}
 
-        {comments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No comments yet.</p>
-        ) : (
-          <ul className="space-y-4">{comments.map((c) => item(c, false))}</ul>
-        )}
+        {layout === "composer-top" &&
+          (comments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No comments yet.</p>
+          ) : (
+            <ul className="space-y-4">{comments.map((c) => item(c, false))}</ul>
+          ))}
       </CardContent>
     </Card>
   );

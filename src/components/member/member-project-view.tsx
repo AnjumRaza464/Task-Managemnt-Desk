@@ -27,7 +27,7 @@ import { ProjectStatusBadge } from "@/components/projects/project-status-badge";
 import { ProjectTimeline } from "@/components/projects/project-timeline";
 import { CommentSection } from "@/components/tasks/comment-section";
 import type { MentionUser } from "@/components/tasks/mention-composer";
-import { useQueryState } from "@/hooks/use-query-state";
+import { useSearchParams } from "next/navigation";
 import { PRIORITY_COLORS, STATUS_COLORS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import type { ProjectDetail, ProjectTask } from "@/lib/queries/projects";
@@ -65,8 +65,18 @@ export function MemberProjectView({
   const { project, access, stats } = data;
   const [creatingIn, setCreatingIn] = useState<string | null | false>(false);
   const manage = Boolean(options && access.canManage);
-  const { get, set } = useQueryState();
-  const view = (VIEWS.some((v) => v.key === get("tab")) ? get("tab") : "board") as View;
+  // Tab switching is purely client-side: all the data is already here, so no server round trip.
+  // The URL is kept in sync with the History API (Next.js picks this up) so links stay shareable.
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [view, setView] = useState<View>(VIEWS.some((v) => v.key === initialTab) ? (initialTab as View) : "board");
+  function switchView(next: View) {
+    setView(next);
+    const url = new URL(window.location.href);
+    if (next === "board") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    window.history.replaceState(window.history.state, "", url.toString());
+  }
   const [query, setQuery] = useState("");
   const [who, setWho] = useState("");
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
@@ -179,7 +189,7 @@ export function MemberProjectView({
                 <button
                   key={v.key}
                   type="button"
-                  onClick={() => set({ tab: v.key === "board" ? null : v.key }, { resetPage: false })}
+                  onClick={() => switchView(v.key)}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",

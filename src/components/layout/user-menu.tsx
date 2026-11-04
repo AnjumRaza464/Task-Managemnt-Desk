@@ -19,6 +19,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { InstallAppMenuItem } from "@/components/pwa/install-app";
 import { ROLE_LABELS } from "@/lib/constants";
 import { getInitials } from "@/lib/utils";
 import type { CurrentUser } from "@/lib/auth-guard";
@@ -93,6 +94,7 @@ export function UserMenu({
               <DropdownMenuItem render={<Link href={notificationsHref} />}>
                 <Bell /> Notifications
               </DropdownMenuItem>
+              <InstallAppMenuItem />
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={() => logoutAction()}>

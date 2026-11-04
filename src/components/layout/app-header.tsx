@@ -9,6 +9,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { ActivityTracker } from "@/components/attendance/activity-tracker";
+import { InstallAppButton } from "@/components/pwa/install-app";
 import { APP_NAME } from "@/lib/constants";
 
 const TITLES: Array<[string, string]> = [
@@ -40,6 +41,7 @@ export function AppHeader({ unreadCount }: { unreadCount: number }) {
       <div className="ml-auto flex items-center gap-1">
         <GlobalSearch scope="manager" />
         <ActivityTracker />
+        <InstallAppButton />
         <Button
           variant="ghost"
           size="icon"

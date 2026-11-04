@@ -1,20 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Download, Share, SquarePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/shared/brand-logo";
 import { cn } from "@/lib/utils";
-
-type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
+import { getInstallPrompt, isStandalone, runInstallPrompt, subscribeInstall } from "@/lib/pwa-install";
 
 const DISMISS_KEY = "unikyn-install-dismissed";
 const DISMISS_DAYS = 7;
 
 function readState() {
   if (typeof window === "undefined") return { standalone: true, ios: false, dismissed: true };
-  const standalone =
-    window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const standalone = isStandalone();
   const ua = navigator.userAgent;
   const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   let dismissed = false;
@@ -34,24 +32,11 @@ function readState() {
  */
 export function InstallBanner({ className, variant = "bar" }: { className?: string; variant?: "bar" | "card" }) {
   const [state, setState] = useState(readState);
-  const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null);
   const [showIosHelp, setShowIosHelp] = useState(false);
+  const prompt = useSyncExternalStore(subscribeInstall, () => Boolean(getInstallPrompt()), () => false);
+  const installedNow = useSyncExternalStore(subscribeInstall, isStandalone, () => true);
 
-  useEffect(() => {
-    const onPrompt = (e: Event) => {
-      e.preventDefault();
-      setPrompt(e as InstallPromptEvent);
-    };
-    const onInstalled = () => setState((s) => ({ ...s, standalone: true }));
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onPrompt);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, []);
-
-  if (state.standalone || state.dismissed) return null;
+  if (state.standalone || installedNow || state.dismissed) return null;
   // Nothing to offer: not iOS and the browser has not said the app is installable (yet).
   if (!state.ios && !prompt) return null;
 
@@ -63,14 +48,12 @@ export function InstallBanner({ className, variant = "bar" }: { className?: stri
   }
 
   async function install() {
-    if (!prompt) {
+    const result = await runInstallPrompt();
+    if (result === null) {
       setShowIosHelp(true);
       return;
     }
-    await prompt.prompt();
-    const { outcome } = await prompt.userChoice;
-    if (outcome === "accepted") setState((s) => ({ ...s, standalone: true }));
-    setPrompt(null);
+    if (result) setState((s) => ({ ...s, standalone: true }));
   }
 
   return (

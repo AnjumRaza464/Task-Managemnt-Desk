@@ -9,6 +9,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { ActivityTracker } from "@/components/attendance/activity-tracker";
+import { InstallAppButton } from "@/components/pwa/install-app";
 
 const TITLES: Array<[string, string]> = [
   ["/my-tasks", "Dashboard"],
@@ -30,6 +31,7 @@ export function MemberHeader({ unreadCount, projectNames }: { unreadCount: numbe
       <div className="ml-auto flex items-center gap-1">
         <GlobalSearch scope="member" />
         <ActivityTracker />
+        <InstallAppButton />
         <Button variant="ghost" size="icon" className="relative" aria-label="Notifications" nativeButton={false} render={<Link href="/my-notifications" />}>
           <Bell className="size-4" />
           {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 flex size-2 rounded-full bg-primary ring-2 ring-background" />}

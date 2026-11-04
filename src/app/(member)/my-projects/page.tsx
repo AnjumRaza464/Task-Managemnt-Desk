@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { FolderKanban } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { syncOverdueTasks } from "@/lib/overdue";
-import { getMyProjects } from "@/lib/queries/projects";
+import { getMyProjects, getWorkspacesOverview } from "@/lib/queries/projects";
+import { getAssignableUsers } from "@/lib/queries/users";
+import { WorkspacesOverview } from "@/components/projects/workspaces-overview";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProjectCard } from "@/components/projects/project-card";
@@ -13,6 +15,21 @@ export const metadata: Metadata = { title: "My projects" };
 export default async function MyProjectsPage() {
   const user = await requireMemberPage();
   await syncOverdueTasks();
+
+  if (user.role === "MANAGER") {
+    const [workspaces, users] = await Promise.all([getWorkspacesOverview(user), getAssignableUsers()]);
+    const projectCount = workspaces.reduce((n, w) => n + w.projects.length, 0);
+    return (
+      <>
+        <PageHeader
+          title="Projects"
+          description={`${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"} · ${projectCount} project${projectCount === 1 ? "" : "s"}`}
+        />
+        <WorkspacesOverview workspaces={workspaces} users={users} canManage isAdmin={false} projectHref="/my-projects" />
+      </>
+    );
+  }
+
   const projects = await getMyProjects(user.id);
 
   const byWorkspace = new Map<string, { name: string; color: string; projects: typeof projects }>();

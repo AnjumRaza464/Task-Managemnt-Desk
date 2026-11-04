@@ -7,6 +7,8 @@ const { auth } = NextAuth(authConfig);
 const PUBLIC_PATHS = ["/login", "/offline", "/manifest.webmanifest"];
 const MEMBER_PREFIX = "/my-tasks";
 const MEMBER_PREFIXES = ["/my-tasks", "/my-files", "/my-projects", "/my-notifications"];
+/** Admin-panel pages a manager may still open from the workspace area. */
+const MANAGER_EXTRA = ["/settings"];
 const isMemberPath = (pathname: string) => MEMBER_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
 /** Manager URLs that have a member-area twin, so shared links still land somewhere useful. */
@@ -37,20 +39,25 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  const isMember = user?.role === "MEMBER";
-  const home = isMember ? MEMBER_PREFIX : "/dashboard";
+  // Admins get the full admin panel; managers and members use the workspace area.
+  const role = user?.role;
+  const isAdmin = role === "ADMIN";
+  const isManager = role === "MANAGER";
+  const isMember = !isAdmin;
+  const home = isAdmin ? "/dashboard" : isManager ? "/my-projects" : MEMBER_PREFIX;
 
   if (pathname === "/offline" || pathname === "/manifest.webmanifest") return NextResponse.next();
   if (isPublic || pathname === "/") {
     return NextResponse.redirect(new URL(home, nextUrl));
   }
 
-  // Members may only use their own area (and API routes, which check access themselves).
-  if (isMember && !isMemberPath(pathname) && !isApi) {
+  const managerAllowed = isManager && MANAGER_EXTRA.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  // Members and managers stay in the workspace area (API routes check access themselves).
+  if (isMember && !isMemberPath(pathname) && !isApi && !managerAllowed) {
     return NextResponse.redirect(new URL(memberEquivalent(pathname), nextUrl));
   }
-  // Managers do not use the member area.
-  if (!isMember && isMemberPath(pathname)) {
+  // Admins do not use the workspace area.
+  if (isAdmin && isMemberPath(pathname)) {
     return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 

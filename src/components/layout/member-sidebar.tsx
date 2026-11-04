@@ -32,7 +32,7 @@ export type SidebarWorkspace = { id: string; name: string; color: string; projec
  * Member navigation: their pages on top, then every project they belong to,
  * grouped by workspace (like the reference WorkHub layout).
  */
-export function MemberSidebar({ user, workspaces }: { user: CurrentUser; workspaces: SidebarWorkspace[] }) {
+export function MemberSidebar({ user, workspaces, canManage = false }: { user: CurrentUser; workspaces: SidebarWorkspace[]; canManage?: boolean }) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
@@ -56,7 +56,7 @@ export function MemberSidebar({ user, workspaces }: { user: CurrentUser; workspa
             <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
             <SidebarGroupContent>
               <p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-                You are not in any project yet.
+                {canManage ? "No workspaces yet. Create one from the Projects page." : "You are not in any project yet."}
               </p>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -115,7 +115,7 @@ export function MemberSidebar({ user, workspaces }: { user: CurrentUser; workspa
       </SidebarContent>
 
       <SidebarFooter>
-        <UserMenu user={user} settingsHref={null} notificationsHref="/my-notifications" />
+        <UserMenu user={user} settingsHref={canManage ? "/settings" : null} notificationsHref="/my-notifications" />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

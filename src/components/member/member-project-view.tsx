@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarDays, FolderInput, GanttChart, GripVertical, KanbanSquare, LayoutList, Lock, MessagesSquare, MoreHorizontal, PieChart, Search } from "lucide-react";
+import { CalendarDays, FolderInput, GanttChart, GripVertical, KanbanSquare, LayoutList, Lock, MessagesSquare, MoreHorizontal, PieChart, Plus, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,6 +21,8 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { SelectField } from "@/components/shared/select-field";
 import { ProjectCalendar } from "@/components/member/project-calendar";
 import { TaskModal } from "@/components/member/task-modal";
+import { ProjectHeaderActions } from "@/components/projects/project-header-actions";
+import { TaskFormDialog } from "@/components/tasks/task-form-dialog";
 import { ProjectStatusBadge } from "@/components/projects/project-status-badge";
 import { ProjectTimeline } from "@/components/projects/project-timeline";
 import { CommentSection } from "@/components/tasks/comment-section";
@@ -29,6 +31,8 @@ import { useQueryState } from "@/hooks/use-query-state";
 import { PRIORITY_COLORS, STATUS_COLORS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import type { ProjectDetail, ProjectTask } from "@/lib/queries/projects";
+import type { TaskFormOptions } from "@/lib/queries/tasks";
+import { toDateInputValue } from "@/lib/utils";
 
 type View = "board" | "list" | "timeline" | "calendar" | "overview" | "discussions";
 
@@ -50,12 +54,17 @@ export function MemberProjectView({
   data,
   currentUserId,
   users,
+  options = null,
 }: {
   data: ProjectDetail;
   currentUserId: string;
   users: MentionUser[];
+  /** Task form options; present when the viewer may create / edit tasks here. */
+  options?: TaskFormOptions | null;
 }) {
   const { project, access, stats } = data;
+  const [creatingIn, setCreatingIn] = useState<string | null | false>(false);
+  const manage = Boolean(options && access.canManage);
   const { get, set } = useQueryState();
   const view = (VIEWS.some((v) => v.key === get("tab")) ? get("tab") : "board") as View;
   const [query, setQuery] = useState("");
@@ -129,7 +138,37 @@ export function MemberProjectView({
               {(project.startDate || project.dueDate) && ` · ${formatDate(project.startDate, "MMM d")} → ${formatDate(project.dueDate, "MMM d, yyyy")}`}
             </p>
           </div>
-          <AssigneeAvatars assignees={project.members.map((m) => ({ user: m.user }))} size="sm" max={6} showNames />
+          <div className="flex flex-wrap items-center gap-2">
+            <AssigneeAvatars assignees={project.members.map((m) => ({ user: m.user }))} size="sm" max={6} showNames />
+            {manage && options && (
+              <>
+                <ProjectHeaderActions
+                  project={{
+                    id: project.id,
+                    workspaceId: project.workspaceId,
+                    name: project.name,
+                    description: project.description ?? "",
+                    color: project.color,
+                    status: project.status,
+                    startDate: toDateInputValue(project.startDate),
+                    dueDate: toDateInputValue(project.dueDate),
+                    memberIds: project.members.map((m) => m.userId),
+                    taskCount: project.tasks.length,
+                  }}
+                  workspaces={[{ id: project.workspace.id, name: project.workspace.name, color: project.workspace.color }]}
+                  users={users}
+                  options={options}
+                  canEdit={false}
+                  canManage
+                  canDelete={access.isGlobalManager}
+                  backHref="/my-projects"
+                />
+                <Button onClick={() => setCreatingIn(project.lists[0]?.id ?? null)}>
+                  <Plus /> New task
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -219,6 +258,13 @@ export function MemberProjectView({
                     ))
                   )}
                 </div>
+                {manage && (
+                  <div className="p-2 pt-0">
+                    <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" onClick={() => setCreatingIn(listId)}>
+                      <Plus /> Add task
+                    </Button>
+                  </div>
+                )}
               </section>
             );
           })}
@@ -301,7 +347,16 @@ export function MemberProjectView({
         />
       )}
 
-      <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && setOpenTaskId(null)} users={users} taskHref="/my-tasks" />
+      <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && setOpenTaskId(null)} users={users} taskHref="/my-tasks" options={options} />
+      {options && (
+        <TaskFormDialog
+          open={creatingIn !== false}
+          onOpenChange={(o) => !o && setCreatingIn(false)}
+          options={options}
+          defaults={{ projectId: project.id, listId: creatingIn || "" }}
+          lockProject
+        />
+      )}
       {/* keep stats referenced for the overview tab */}
       <span className="hidden">{stats.total}</span>
     </>

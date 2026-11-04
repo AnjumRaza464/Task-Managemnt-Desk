@@ -109,13 +109,13 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
       id: p.id,
       label: p.name,
       detail: `${p.workspace.name} · ${p._count.tasks} task${p._count.tasks === 1 ? "" : "s"}`,
-      href: `/projects/${p.id}`,
+      href: user.role === "ADMIN" ? `/projects/${p.id}` : `/my-projects/${p.id}`,
     })),
     tasks: tasks.map((t) => ({
       id: t.id,
       label: t.title,
       detail: `${t.assignees.map((a) => a.user.name).join(", ") || "Unassigned"} · ${STATUS_LABELS[t.status]} · due ${format(t.dueDate, "MMM d")}`,
-      href: `/tasks/${t.id}`,
+      href: user.role === "ADMIN" ? `/tasks/${t.id}` : `/my-tasks/${t.id}`,
     })),
     users: users.map((u) => ({ id: u.id, label: u.name, detail: `${ROLE_LABELS[u.role]} · ${u.email}`, href: `/users/${u.id}` })),
     plans: plans.map((p) => ({

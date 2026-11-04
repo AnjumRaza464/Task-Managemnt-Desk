@@ -3,10 +3,14 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarDays, CheckCircle2, Circle, ExternalLink, FileText, Flag, Loader2, Lock, MessageSquare, Paperclip, Upload, X } from "lucide-react";
+import { CalendarDays, CheckCircle2, Circle, ExternalLink, FileText, Flag, Loader2, Lock, MessageSquare, Paperclip, Pencil, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { updateSubtask } from "@/actions/subtasks";
 import { uploadAttachment } from "@/actions/attachments";
+import { deleteTask } from "@/actions/tasks";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { TaskFormDialog, taskToFormValues } from "@/components/tasks/task-form-dialog";
+import type { TaskFormOptions } from "@/lib/queries/tasks";
 import { getTaskPanel, type TaskPanel } from "@/actions/task-view";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,13 +33,18 @@ export function TaskModal({
   onOpenChange,
   users,
   taskHref,
+  options = null,
 }: {
   taskId: string | null;
   onOpenChange: (open: boolean) => void;
   users: MentionUser[];
   taskHref: string;
+  /** Task form options; when present and the viewer can manage the task, Edit / Delete are shown. */
+  options?: TaskFormOptions | null;
 }) {
   const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [task, setTask] = useState<TaskPanel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pane, setPane] = useState<"details" | "chat">("details");
@@ -162,6 +171,16 @@ export function TaskModal({
                     </div>
                     <h2 className="text-xl font-semibold leading-tight">{task.title}</h2>
                   </div>
+                  {options && task.access.canManage && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                        <Pencil /> Edit
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleting(true)}>
+                        <Trash2 /> Delete
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon-sm"
@@ -307,6 +326,49 @@ export function TaskModal({
           </div>
         </div>
       </DialogContent>
+
+      {options && task && (
+        <TaskFormDialog
+          open={editing}
+          onOpenChange={setEditing}
+          task={taskToFormValues({
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            assigneeId: task.assigneeId,
+            assignees: task.assignees,
+            categoryId: task.categoryId,
+            projectId: task.projectId,
+            listId: task.listId,
+            milestoneId: task.milestoneId,
+            priority: task.priority,
+            status: task.status,
+            completion: task.completion,
+            startDate: task.startDate,
+            dueDate: task.dueDate,
+            recurrence: task.recurrence,
+            recurrenceEndsAt: task.recurrenceEndsAt,
+          })}
+          options={options}
+          onSaved={reload}
+        />
+      )}
+      {task && (
+        <ConfirmDialog
+          open={deleting}
+          onOpenChange={setDeleting}
+          title="Delete this task?"
+          description={`"${task.title}" and all of its subtasks, comments and attachments will be permanently removed.`}
+          confirmLabel="Delete task"
+          onConfirm={async () => {
+            const result = await deleteTask(task.id);
+            if (!result.ok) throw new Error(result.error);
+            toast.success("Task deleted");
+            onOpenChange(false);
+            router.refresh();
+          }}
+        />
+      )}
     </Dialog>
   );
 }

@@ -45,7 +45,7 @@ export async function getCurrentManager(): Promise<CurrentManager | null> {
   return user as CurrentManager;
 }
 
-/** For manager pages/layouts: members go to their own view, guests to /login. */
+/** For admin-panel pages/layouts: members and managers go to the workspace area, guests to /login. */
 export async function requireManagerPage(): Promise<CurrentManager> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -53,11 +53,11 @@ export async function requireManagerPage(): Promise<CurrentManager> {
   return user as CurrentManager;
 }
 
-/** For member pages: managers go to the dashboard, guests to /login. */
+/** For workspace-area pages (members and managers): admins go to the dashboard, guests to /login. */
 export async function requireMemberPage(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "MEMBER") redirect("/dashboard");
+  if (user.role === "ADMIN") redirect("/dashboard");
   return user;
 }
 

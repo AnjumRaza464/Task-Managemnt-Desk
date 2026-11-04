@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarRange, Infinity as InfinityIcon } from "lucide-react";
 import { requireManagerPage } from "@/lib/auth-guard";
+import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import {
   getMonthlyReport,
@@ -35,7 +36,8 @@ type ReportKey = (typeof REPORTS)[number]["key"];
 
 export default async function ReportsPage({ searchParams }: PageProps<"/reports">) {
   await requireManagerPage();
-  await syncOverdueTasks();
+  // Overdue sync runs after the response is sent so it never delays the page.
+  after(() => syncOverdueTasks());
   const params = await searchParams;
   const report: ReportKey = REPORTS.some((r) => r.key === params.report) ? (params.report as ReportKey) : "monthly";
   const allTime = params.scope === "all";

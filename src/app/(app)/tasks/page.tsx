@@ -3,6 +3,7 @@ import Link from "next/link";
 import { KanbanSquare } from "lucide-react";
 import { requireManagerPage } from "@/lib/auth-guard";
 import { getTaskFormOptions, getTasks, parseTaskFilters } from "@/lib/queries/tasks";
+import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
@@ -15,7 +16,8 @@ export const metadata: Metadata = { title: "Tasks" };
 
 export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   await requireManagerPage();
-  await syncOverdueTasks();
+  // Overdue sync runs after the response is sent so it never delays the page.
+  after(() => syncOverdueTasks());
   const filters = parseTaskFilters(await searchParams);
   const [result, options] = await Promise.all([getTasks(filters), getTaskFormOptions()]);
 

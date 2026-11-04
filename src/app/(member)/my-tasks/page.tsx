@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CheckSquare, ListTodo, MessageSquare, Paperclip, Users } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
+import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { monthRange } from "@/lib/dates";
 import { taskListInclude } from "@/lib/queries/tasks";
@@ -17,7 +18,8 @@ export const metadata: Metadata = { title: "My tasks" };
 
 export default async function MyTasksPage({ searchParams }: PageProps<"/my-tasks">) {
   const user = await requireMemberPage();
-  await syncOverdueTasks();
+  // Overdue sync runs after the response is sent so it never delays the page.
+  after(() => syncOverdueTasks());
   const params = await searchParams;
   const selected = typeof params.month === "string" ? params.month : "";
 

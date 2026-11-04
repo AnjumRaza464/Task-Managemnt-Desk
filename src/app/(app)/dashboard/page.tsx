@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { requireManagerPage } from "@/lib/auth-guard";
+import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { getDashboardData } from "@/lib/queries/dashboard";
 import { activityDetail, activityLabel } from "@/lib/activity-format";
@@ -28,7 +29,8 @@ export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
   const manager = await requireManagerPage();
-  await syncOverdueTasks();
+  // Overdue sync runs after the response is sent so it never delays the page.
+  after(() => syncOverdueTasks());
   const data = await getDashboardData();
   const { stats } = data;
 

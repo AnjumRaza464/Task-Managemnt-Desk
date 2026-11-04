@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarRange, FolderKanban, Repeat } from "lucide-react";
 import { requireManagerPage } from "@/lib/auth-guard";
+import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { getDependencyCandidates, getTaskById, getTaskFormOptions } from "@/lib/queries/tasks";
 import { MONTH_NAMES, RECURRENCE_LABELS } from "@/lib/constants";
@@ -24,7 +25,8 @@ export const metadata: Metadata = { title: "Task" };
 
 export default async function TaskDetailPage({ params }: PageProps<"/tasks/[id]">) {
   const manager = await requireManagerPage();
-  await syncOverdueTasks();
+  // Overdue sync runs after the response is sent so it never delays the page.
+  after(() => syncOverdueTasks());
   const { id } = await params;
   const [task, options] = await Promise.all([getTaskById(id), getTaskFormOptions(manager)]);
   if (!task) notFound();

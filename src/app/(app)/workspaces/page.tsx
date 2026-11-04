@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireManagerPage } from "@/lib/auth-guard";
+import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { getWorkspacesOverview } from "@/lib/queries/projects";
 import { getAssignableUsers } from "@/lib/queries/users";
@@ -10,7 +11,8 @@ export const metadata: Metadata = { title: "Projects" };
 
 export default async function WorkspacesPage() {
   const manager = await requireManagerPage();
-  await syncOverdueTasks();
+  // Overdue sync runs after the response is sent so it never delays the page.
+  after(() => syncOverdueTasks());
   const [workspaces, users] = await Promise.all([getWorkspacesOverview(manager), getAssignableUsers()]);
   const projectCount = workspaces.reduce((n, w) => n + w.projects.length, 0);
 

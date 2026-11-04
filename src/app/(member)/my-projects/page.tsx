@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { FolderKanban } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
+import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { getMyProjects, getWorkspacesOverview } from "@/lib/queries/projects";
 import { getAssignableUsers } from "@/lib/queries/users";
@@ -14,7 +15,8 @@ export const metadata: Metadata = { title: "My projects" };
 
 export default async function MyProjectsPage() {
   const user = await requireMemberPage();
-  await syncOverdueTasks();
+  // Overdue sync runs after the response is sent so it never delays the page.
+  after(() => syncOverdueTasks());
 
   if (user.role === "MANAGER") {
     const [workspaces, users] = await Promise.all([getWorkspacesOverview(user), getAssignableUsers()]);

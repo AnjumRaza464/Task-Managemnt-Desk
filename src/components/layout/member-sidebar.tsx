@@ -92,7 +92,7 @@ export function MemberSidebar({ user, workspaces, canManage = false }: { user: C
                           const active = isActive(`/my-projects/${p.id}`);
                           return (
                             <SidebarMenuSubItem key={p.id}>
-                              <SidebarMenuSubButton isActive={active} render={<Link href={`/my-projects/${p.id}`} />} className="h-8">
+                              <SidebarMenuSubButton isActive={active} render={<Link href={`/my-projects/${p.id}`} prefetch />} className="h-8">
                                 <FolderKanban className="size-4" style={{ color: p.color }} />
                                 <span className="flex-1 truncate">{p.name}</span>
                                 {p.openTasks > 0 && (

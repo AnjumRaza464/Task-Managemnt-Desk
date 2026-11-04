@@ -78,9 +78,14 @@ export type ProjectTask = Prisma.TaskGetPayload<{ include: typeof projectTaskInc
 
 /** Full project page data, or null when it does not exist / the user may not see it. */
 export async function getProjectForUser(id: string, user: CurrentUser) {
-  const access = await getProjectAccess(user, id);
-  if (!access) return null;
-  const project = await prisma.project.findUnique({
+  // Access check and the project load run in parallel; the result is dropped when access is denied.
+  const [access, project] = await Promise.all([getProjectAccess(user, id), loadProject(id)]);
+  if (!access || !project) return null;
+  return { project, access, stats: projectStats(project.tasks) };
+}
+
+function loadProject(id: string) {
+  return prisma.project.findUnique({
     where: { id },
     include: {
       workspace: { select: { id: true, name: true, color: true } },
@@ -109,13 +114,11 @@ export async function getProjectForUser(id: string, user: CurrentUser) {
       },
       activity: {
         orderBy: { createdAt: "desc" },
-        take: 40,
+        take: 30,
         include: { actor: { select: { name: true } }, task: { select: { id: true, title: true } } },
       },
     },
   });
-  if (!project) return null;
-  return { project, access, stats: projectStats(project.tasks) };
 }
 
 export type ProjectDetail = NonNullable<Awaited<ReturnType<typeof getProjectForUser>>>;

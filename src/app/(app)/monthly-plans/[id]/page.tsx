@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Briefcase, Building2, Mail } from "lucide-react";
 import { requireManagerPage } from "@/lib/auth-guard";
+import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { defaultDueDateInMonth } from "@/lib/dates";
 import { getPlanById } from "@/lib/queries/plans";
@@ -22,7 +23,8 @@ export const metadata: Metadata = { title: "Monthly plan" };
 
 export default async function PlanDetailPage({ params }: PageProps<"/monthly-plans/[id]">) {
   await requireManagerPage();
-  await syncOverdueTasks();
+  // Overdue sync runs after the response is sent so it never delays the page.
+  after(() => syncOverdueTasks());
   const { id } = await params;
   const [plan, options] = await Promise.all([getPlanById(id), getTaskFormOptions()]);
   if (!plan) notFound();

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireMemberPage } from "@/lib/auth-guard";
+import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { getNotifications, getUnreadNotificationCount } from "@/lib/queries/notifications";
 import { PageHeader } from "@/components/shared/page-header";
@@ -9,7 +10,8 @@ export const metadata: Metadata = { title: "Notifications" };
 
 export default async function MemberNotificationsPage({ searchParams }: PageProps<"/my-notifications">) {
   const user = await requireMemberPage();
-  await syncOverdueTasks();
+  // Overdue sync runs after the response is sent so it never delays the page.
+  after(() => syncOverdueTasks());
   const params = await searchParams;
   const filter = params.filter === "unread" ? "unread" : "all";
   const [notifications, unreadCount] = await Promise.all([getNotifications(user.id, filter), getUnreadNotificationCount(user.id)]);

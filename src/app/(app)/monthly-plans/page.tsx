@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireManagerPage } from "@/lib/auth-guard";
+import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { defaultDueDateInMonth } from "@/lib/dates";
 import { getMonthOverview } from "@/lib/queries/plans";
@@ -15,7 +16,8 @@ export const metadata: Metadata = { title: "Monthly Plans" };
 
 export default async function MonthlyPlansPage({ searchParams }: PageProps<"/monthly-plans">) {
   await requireManagerPage();
-  await syncOverdueTasks();
+  // Overdue sync runs after the response is sent so it never delays the page.
+  after(() => syncOverdueTasks());
   const params = await searchParams;
   const { year, month } = parseMonthKey(typeof params.month === "string" ? params.month : undefined);
 

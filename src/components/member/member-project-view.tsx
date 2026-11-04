@@ -1,7 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CalendarDays, GanttChart, KanbanSquare, LayoutList, Lock, MessagesSquare, PieChart, Search } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { moveTaskToList } from "@/actions/lists";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CalendarDays, FolderInput, GanttChart, GripVertical, KanbanSquare, LayoutList, Lock, MessagesSquare, MoreHorizontal, PieChart, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -51,16 +61,49 @@ export function MemberProjectView({
   const [query, setQuery] = useState("");
   const [who, setWho] = useState("");
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+
+  // Local copy of the tasks so a drag shows instantly; fresh server data replaces it after refresh.
+  const [allTasks, setAllTasks] = useState(project.tasks);
+  const [prevTasks, setPrevTasks] = useState(project.tasks);
+  if (project.tasks !== prevTasks) {
+    setPrevTasks(project.tasks);
+    setAllTasks(project.tasks);
+  }
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overCol, setOverCol] = useState<string | null>(null);
+
+  // Project members may move any task between lists; an assignee may move their own.
+  const canMove = (t: ProjectTask) => access.canEdit || t.assignees.some((a) => a.userId === currentUserId);
+
+  function move(id: string, listId: string | null) {
+    const task = allTasks.find((t) => t.id === id);
+    if (!task || (task.listId ?? null) === listId) return;
+    const snapshot = allTasks;
+    const target = project.lists.find((l) => l.id === listId);
+    setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, listId, list: target ? { id: target.id, name: target.name } : null } : t)));
+    startTransition(async () => {
+      const result = await moveTaskToList({ id, listId });
+      if (!result.ok) {
+        setAllTasks(snapshot);
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`Moved to ${target?.name ?? "Unsorted"}`);
+      router.refresh();
+    });
+  }
 
   const tasks = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return project.tasks.filter((t) => {
+    return allTasks.filter((t) => {
       if (q && !t.title.toLowerCase().includes(q) && !(t.description ?? "").toLowerCase().includes(q)) return false;
       if (who === "me" && !t.assignees.some((a) => a.userId === currentUserId)) return false;
       if (who && who !== "me" && !t.assignees.some((a) => a.userId === who)) return false;
       return true;
     });
-  }, [project.tasks, query, who, currentUserId]);
+  }, [allTasks, query, who, currentUserId]);
 
   const people = project.members.map((m) => ({ value: m.userId, label: m.userId === currentUserId ? "Me" : m.user.name }));
   const columns = [
@@ -119,21 +162,66 @@ export function MemberProjectView({
 
       {view === "board" && (
         <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 md:-mx-6 md:px-6">
-          {columns.map((col) => (
-            <section key={col.key} className="flex w-72 shrink-0 flex-col rounded-xl border bg-muted/40" aria-label={`${col.name} list`}>
-              <header className="flex items-center gap-2 px-3 py-2.5">
-                <span className="truncate text-sm font-medium">{col.name}</span>
-                <span className="ml-auto rounded-full bg-background px-2 py-0.5 text-xs tabular-nums text-muted-foreground">{col.items.length}</span>
-              </header>
-              <div className="flex max-h-[calc(100svh-22rem)] min-h-24 flex-col gap-2 overflow-y-auto p-2 pt-0">
-                {col.items.length === 0 ? (
-                  <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed p-4 text-xs text-muted-foreground">No tasks</div>
-                ) : (
-                  col.items.map((t) => <BoardCard key={t.id} task={t} onOpen={() => setOpenTaskId(t.id)} />)
-                )}
-              </div>
-            </section>
-          ))}
+          {columns.map((col) => {
+            const listId = col.key === "unsorted" ? null : col.key;
+            const isOver = overCol === col.key && dragId !== null;
+            return (
+              <section
+                key={col.key}
+                className={cn("flex w-72 shrink-0 flex-col rounded-xl border bg-muted/40 transition-colors", isOver && "border-primary/50 bg-primary/5")}
+                aria-label={`${col.name} list`}
+                onDragOver={(e) => {
+                  if (!dragId) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (overCol !== col.key) setOverCol(col.key);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOverCol(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const id = e.dataTransfer.getData("text/plain") || dragId;
+                  setOverCol(null);
+                  setDragId(null);
+                  if (id) move(id, listId);
+                }}
+              >
+                <header className="flex items-center gap-2 px-3 py-2.5">
+                  <span className="truncate text-sm font-medium">{col.name}</span>
+                  <span className="ml-auto rounded-full bg-background px-2 py-0.5 text-xs tabular-nums text-muted-foreground">{col.items.length}</span>
+                </header>
+                <div className="flex max-h-[calc(100svh-22rem)] min-h-24 flex-col gap-2 overflow-y-auto p-2 pt-0">
+                  {col.items.length === 0 ? (
+                    <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed p-4 text-xs text-muted-foreground">
+                      {dragId ? "Drop here" : "No tasks"}
+                    </div>
+                  ) : (
+                    col.items.map((t) => (
+                      <BoardCard
+                        key={t.id}
+                        task={t}
+                        lists={project.lists}
+                        draggable={canMove(t)}
+                        dragging={dragId === t.id}
+                        onOpen={() => setOpenTaskId(t.id)}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", t.id);
+                          e.dataTransfer.effectAllowed = "move";
+                          setDragId(t.id);
+                        }}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setOverCol(null);
+                        }}
+                        onMove={(to) => move(t.id, to)}
+                      />
+                    ))
+                  )}
+                </div>
+              </section>
+            );
+          })}
           {columns.length === 0 && <EmptyState title="No lists in this project" className="w-full" />}
         </div>
       )}
@@ -220,18 +308,58 @@ export function MemberProjectView({
   );
 }
 
-function BoardCard({ task, onOpen }: { task: ProjectTask; onOpen: () => void }) {
+function BoardCard({
+  task,
+  lists,
+  draggable,
+  dragging,
+  onOpen,
+  onDragStart,
+  onDragEnd,
+  onMove,
+}: {
+  task: ProjectTask;
+  lists: { id: string; name: string }[];
+  draggable: boolean;
+  dragging: boolean;
+  onOpen: () => void;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+  onMove: (listId: string | null) => void;
+}) {
   const overdue = task.status === "OVERDUE";
   return (
-    <button
-      type="button"
-      onClick={onOpen}
+    <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       className={cn(
-        "rounded-lg border bg-card p-3 text-left shadow-xs transition-colors hover:border-primary/40 hover:bg-accent/40",
+        "group rounded-lg border bg-card p-3 text-left shadow-xs transition-colors hover:border-primary/40 hover:bg-accent/40",
+        draggable && "cursor-grab active:cursor-grabbing",
+        dragging && "opacity-40",
         task.status === "COMPLETED" && "opacity-75",
       )}
     >
-      <p className="line-clamp-2 text-sm font-medium leading-snug">{task.title}</p>
+      <div className="flex items-start gap-1">
+        {draggable && <GripVertical className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/50" aria-hidden />}
+        <button type="button" onClick={onOpen} draggable={false} className="line-clamp-2 min-w-0 flex-1 text-left text-sm font-medium leading-snug hover:underline">
+          {task.title}
+        </button>
+        {draggable && (
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="-mt-0.5 -mr-1 shrink-0" aria-label="Move task" />}>
+              <MoreHorizontal />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              {lists.map((l) => (
+                <DropdownMenuItem key={l.id} disabled={l.id === task.listId} onClick={() => onMove(l.id)}>
+                  <FolderInput /> {l.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span className="size-2 rounded-full" style={{ backgroundColor: overdue ? STATUS_COLORS.OVERDUE : PRIORITY_COLORS[task.priority] }} />
@@ -240,7 +368,7 @@ function BoardCard({ task, onOpen }: { task: ProjectTask; onOpen: () => void }) 
         </span>
         <AssigneeAvatars assignees={task.assignees} size="xs" max={3} />
       </div>
-    </button>
+    </div>
   );
 }
 

@@ -219,7 +219,14 @@ export async function getTaskFormOptions(user?: CurrentUser) {
     prisma.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, color: true } }),
     user ? getProjectOptions(user) : getProjectOptions({ id: "", name: "", email: "", role: "ADMIN" }),
   ]);
-  return { users, categories, projects, canCreateOutsideProject: !user || user.role !== "MEMBER" };
+  return {
+    users,
+    categories,
+    projects,
+    canCreateOutsideProject: !user || user.role !== "MEMBER",
+    // Categories are an admin-panel concept; the workspace area (managers and members) does not pick them.
+    showCategory: !user || user.role === "ADMIN",
+  };
 }
 
 export type TaskFormOptions = Awaited<ReturnType<typeof getTaskFormOptions>>;

@@ -230,25 +230,27 @@ export function TaskFormDialog({
               />
               {err("assigneeIds") && <p className="text-xs text-destructive">{err("assigneeIds")}</p>}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="category">Category</Label>
-              <SelectField
-                id="category"
-                value={values.categoryId}
-                onChange={(v) => set("categoryId", v)}
-                placeholder="No category"
-                options={options.categories.map((c) => ({
-                  value: c.id,
-                  textLabel: c.name,
-                  label: (
-                    <span className="flex items-center gap-2">
-                      <span className="size-2 rounded-full" style={{ backgroundColor: c.color }} />
-                      {c.name}
-                    </span>
-                  ),
-                }))}
-              />
-            </div>
+            {options.showCategory && (
+              <div className="space-y-1.5">
+                <Label htmlFor="category">Category</Label>
+                <SelectField
+                  id="category"
+                  value={values.categoryId}
+                  onChange={(v) => set("categoryId", v)}
+                  placeholder="No category"
+                  options={options.categories.map((c) => ({
+                    value: c.id,
+                    textLabel: c.name,
+                    label: (
+                      <span className="flex items-center gap-2">
+                        <span className="size-2 rounded-full" style={{ backgroundColor: c.color }} />
+                        {c.name}
+                      </span>
+                    ),
+                  }))}
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="priority">Priority</Label>
               <SelectField

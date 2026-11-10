@@ -63,15 +63,12 @@ export function MemberSidebar({
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href={canManage ? "/my-projects" : "/my-tasks"} />} className="data-[state=open]:bg-sidebar-accent">
-              <BrandMark className="hidden group-data-[collapsible=icon]:block" />
-              <BrandLogo className="h-9 group-data-[collapsible=icon]:hidden" />
-              <span className="sr-only">{APP_NAME}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        {/* The logo is a plain brand mark, not a link. */}
+        <div className="flex h-12 items-center px-2">
+          <BrandMark className="hidden group-data-[collapsible=icon]:block" />
+          <BrandLogo className="h-9 group-data-[collapsible=icon]:hidden" />
+          <span className="sr-only">{APP_NAME}</span>
+        </div>
       </SidebarHeader>
 
       <SidebarContent>

@@ -21,6 +21,7 @@ export function MentionComposer({
   disabled,
   autoFocus,
   onSubmit,
+  onPasteFile,
   className,
   ariaLabel,
 }: {
@@ -32,6 +33,8 @@ export function MentionComposer({
   disabled?: boolean;
   autoFocus?: boolean;
   onSubmit?: () => void;
+  /** Called with an image pasted from the clipboard (Ctrl+V) instead of inserting it as text. */
+  onPasteFile?: (file: File) => void;
   className?: string;
   ariaLabel?: string;
 }) {
@@ -92,6 +95,13 @@ export function MentionComposer({
         }}
         onClick={(e) => detect(value, e.currentTarget.selectionStart ?? value.length)}
         onBlur={() => setTimeout(() => setQuery(null), 150)}
+        onPaste={(e) => {
+          if (!onPasteFile) return;
+          const file = pastedImage(e.clipboardData);
+          if (!file) return;
+          e.preventDefault();
+          onPasteFile(file);
+        }}
         onKeyDown={(e) => {
           if (open) {
             if (e.key === "ArrowDown") {
@@ -151,28 +161,108 @@ export function MentionComposer({
   );
 }
 
-/** Ids of the users whose "@Name" appears in the text. */
-export function mentionedIds(text: string, users: MentionUser[]): string[] {
-  return users.filter((u) => text.includes(`@${u.name}`)).map((u) => u.id);
+/** The first image in a paste (e.g. a screenshot or a copied picture), named so it is recognisable in the file list. */
+function pastedImage(data: DataTransfer): File | null {
+  const item = Array.from(data.items).find((i) => i.kind === "file" && i.type.startsWith("image/"));
+  const file = item?.getAsFile();
+  if (!file) return null;
+  const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15);
+  return new File([file], `pasted-image-${stamp}.${ext}`, { type: file.type });
 }
 
-/** Splits comment text so "@Name" tokens of known users are highlighted. */
-export function renderWithMentions(text: string, users: { id: string; name: string }[], currentUserId?: string): React.ReactNode[] {
-  if (users.length === 0) return [text];
-  const names = [...users].sort((a, b) => b.name.length - a.name.length);
-  const pattern = new RegExp(`@(${names.map((u) => u.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g");
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** The words of a name that can stand in for it: "Muhammad Ali" → ["Muhammad", "Ali"]. */
+const nameParts = (name: string) => name.trim().split(/\s+/).filter((part) => part.length >= 2);
+
+/**
+ * "@Full Name" or any single "@Word" of a known user's name, in any letter
+ * case, not followed by more word characters (so "@ali" is not part of "@alice").
+ */
+function mentionPattern(users: { name: string }[]): RegExp | null {
+  const alternatives = new Set<string>();
+  for (const u of users) {
+    if (u.name.trim()) alternatives.add(escapeRe(u.name.trim()));
+    for (const part of nameParts(u.name)) alternatives.add(escapeRe(part));
+  }
+  if (alternatives.size === 0) return null;
+  // Longest first so "Muhammad Ali" wins over "Muhammad".
+  const sorted = [...alternatives].sort((a, b) => b.length - a.length);
+  return new RegExp(`@(${sorted.join("|")})(?![\\p{L}\\p{N}_])`, "giu");
+}
+
+/** Users a typed "@token" refers to: full name or any word of the name, case-insensitive. */
+function usersFor<T extends { name: string }>(token: string, users: T[]): T[] {
+  const needle = token.toLowerCase();
+  return users.filter((u) => u.name.trim().toLowerCase() === needle || nameParts(u.name).some((part) => part.toLowerCase() === needle));
+}
+
+/** Ids of the users whose "@Name" (or "@AnyWordOfTheName") appears in the text. */
+export function mentionedIds(text: string, users: MentionUser[]): string[] {
+  const pattern = mentionPattern(users);
+  if (!pattern) return [];
+  const ids = new Set<string>();
+  for (const match of text.matchAll(pattern)) for (const u of usersFor(match[1], users)) ids.add(u.id);
+  return [...ids];
+}
+
+const URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+
+/** Turns http(s):// and www. URLs in plain text into links that open in a new tab. */
+export function renderWithLinks(text: string, keyPrefix = ""): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  for (const match of text.matchAll(URL_PATTERN)) {
+    const index = match.index ?? 0;
+    // Trailing punctuation belongs to the sentence, not the URL.
+    let url = match[0];
+    const trailing = url.match(/[.,;:!?)\]]+$/)?.[0] ?? "";
+    url = url.slice(0, url.length - trailing.length);
+    if (index > last) out.push(text.slice(last, index));
+    out.push(
+      <a
+        key={`${keyPrefix}${index}`}
+        href={url.startsWith("www.") ? `https://${url}` : url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="break-all underline underline-offset-2 hover:opacity-80"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {url}
+      </a>,
+    );
+    last = index + url.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+/**
+ * Splits comment text so "@Name" / "@NamePart" tokens of known users are
+ * highlighted and URLs are clickable. `onPrimary` picks colours that stay
+ * readable inside the sender's own (primary-coloured) chat bubble.
+ */
+export function renderWithMentions(
+  text: string,
+  users: { id: string; name: string }[],
+  currentUserId?: string,
+  onPrimary = false,
+): React.ReactNode[] {
+  const pattern = mentionPattern(users);
+  if (!pattern) return renderWithLinks(text);
   const out: React.ReactNode[] = [];
   let last = 0;
   for (const match of text.matchAll(pattern)) {
     const index = match.index ?? 0;
-    if (index > last) out.push(text.slice(last, index));
-    const user = users.find((u) => u.name === match[1]);
+    if (index > last) out.push(...renderWithLinks(text.slice(last, index), `${last}-`));
+    const isMe = usersFor(match[1], users).some((u) => u.id === currentUserId);
     out.push(
       <span
         key={`${index}-${match[1]}`}
         className={cn(
-          "rounded bg-primary/10 px-1 font-medium text-primary",
-          user?.id === currentUserId && "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200",
+          "rounded px-1 font-semibold",
+          onPrimary ? "bg-white/25 text-primary-foreground" : "bg-primary/10 text-primary",
+          isMe && (onPrimary ? "bg-amber-300 text-amber-950" : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200"),
         )}
       >
         @{match[1]}
@@ -180,6 +270,6 @@ export function renderWithMentions(text: string, users: { id: string; name: stri
     );
     last = index + match[0].length;
   }
-  if (last < text.length) out.push(text.slice(last));
+  if (last < text.length) out.push(...renderWithLinks(text.slice(last), `${last}-`));
   return out;
 }

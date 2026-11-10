@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { getTaskMessages, postTaskMessage, type TaskMessage, type TaskMessageAttachment } from "@/actions/task-messages";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { MentionComposer, mentionedIds, renderWithMentions, type MentionUser } from "@/components/tasks/mention-composer";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
@@ -14,10 +15,11 @@ import type { CommentKind } from "@/generated/prisma/enums";
 
 const POLL_MS = 5000;
 
-/** A file chip inside a message: images show a preview, everything else a download row. */
+/** A file chip inside a message: images show a large preview, everything else a download row. */
 export function AttachmentChip({ file, mine = false }: { file: TaskMessageAttachment; mine?: boolean }) {
   const href = `/api/attachments/${file.id}`;
   const isImage = file.mimeType.startsWith("image/");
+  if (isImage) return <ImageAttachment file={file} href={href} mine={mine} />;
   return (
     <a
       href={href}
@@ -28,17 +30,39 @@ export function AttachmentChip({ file, mine = false }: { file: TaskMessageAttach
         mine ? "border-white/20 bg-white/10 text-primary-foreground hover:bg-white/15" : "bg-background",
       )}
     >
-      {isImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={href} alt={file.fileName} className="size-10 shrink-0 rounded object-cover" />
-      ) : (
-        <FileText className="size-4 shrink-0 opacity-70" />
-      )}
+      <FileText className="size-4 shrink-0 opacity-70" />
       <span className="min-w-0">
         <span className="block truncate font-medium">{file.fileName}</span>
         <span className="block opacity-70">{formatBytes(file.size)}</span>
       </span>
     </a>
+  );
+}
+
+/**
+ * An image in a message: a large inline preview that opens full-size in a
+ * lightbox right here (no new tab). Right-click the picture to save it.
+ */
+function ImageAttachment({ file, href, mine }: { file: TaskMessageAttachment; href: string; mine: boolean }) {
+  const [open, setOpen] = useState(false);
+  const label = `${file.fileName} · ${formatBytes(file.size)}`;
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="mt-1.5 block max-w-sm cursor-zoom-in text-left" title={`${label} · click to view`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={href} alt={file.fileName} loading="lazy" className="max-h-72 w-auto max-w-full rounded-lg border bg-background object-contain" />
+        <span className={cn("mt-0.5 block truncate text-[11px]", mine ? "text-primary-foreground/80" : "text-muted-foreground")}>{label}</span>
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="w-auto max-w-[95vw] gap-2 bg-black/90 p-2 text-white ring-white/10 sm:max-w-[95vw] [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:bg-white/15">
+          <DialogTitle className="sr-only">{file.fileName}</DialogTitle>
+          <DialogDescription className="sr-only">Image preview. Right-click the image to save it.</DialogDescription>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={href} alt={file.fileName} className="max-h-[85vh] max-w-[90vw] rounded-md object-contain" />
+          <p className="truncate px-1 text-center text-xs text-white/70">{label}</p>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -64,6 +88,16 @@ function pickFile(e: React.ChangeEvent<HTMLInputElement>, set: (f: File | null) 
     return;
   }
   set(f);
+}
+
+/** An image pasted with Ctrl+V becomes the pending attachment, like a picked file. */
+function acceptPasted(file: File, set: (f: File | null) => void) {
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    toast.error("Pasted image is larger than 5 MB.");
+    return;
+  }
+  set(file);
+  toast.success("Image attached");
 }
 
 /**
@@ -197,7 +231,7 @@ export function TaskConversation({
   const messages = current.messages;
   const topLevel = messages.filter((m) => !m.parentId);
   const repliesOf = (id: string) => messages.filter((m) => m.parentId === id);
-  const mentionUsersFor = (m: TaskMessage) => users.filter((u) => m.mentions.some((x) => x.userId === u.id) || m.content.includes(`@${u.name}`));
+
 
   function chatBubble(m: TaskMessage) {
     const mine = m.author.id === currentUserId;
@@ -212,7 +246,7 @@ export function TaskConversation({
             <span title={formatDateTime(m.createdAt)}>{timeAgo(m.createdAt)}</span>
           </div>
           <div className={cn("mt-0.5 rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap", mine ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted")}>
-            {m.content && <span>{renderWithMentions(m.content, mentionUsersFor(m), currentUserId)}</span>}
+            {m.content && <span>{renderWithMentions(m.content, users, currentUserId, mine)}</span>}
             {m.attachments.map((f) => (
               <AttachmentChip key={f.id} file={f} mine={mine} />
             ))}
@@ -238,7 +272,7 @@ export function TaskConversation({
               {replies.length > 0 && ` · ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
             </p>
             {m.title && m.content && (
-              <p className="mt-1.5 whitespace-pre-wrap text-sm text-muted-foreground">{renderWithMentions(m.content, mentionUsersFor(m), currentUserId)}</p>
+              <p className="mt-1.5 whitespace-pre-wrap text-sm text-muted-foreground">{renderWithMentions(m.content, users, currentUserId)}</p>
             )}
             {m.attachments.map((f) => (
               <AttachmentChip key={f.id} file={f} />
@@ -258,7 +292,7 @@ export function TaskConversation({
                     <span className="font-medium text-foreground">{r.author.id === currentUserId ? "You" : r.author.name}</span> ·{" "}
                     <span title={formatDateTime(r.createdAt)}>{timeAgo(r.createdAt)}</span>
                   </p>
-                  {r.content && <p className="whitespace-pre-wrap text-sm">{renderWithMentions(r.content, mentionUsersFor(r), currentUserId)}</p>}
+                  {r.content && <p className="whitespace-pre-wrap text-sm">{renderWithMentions(r.content, users, currentUserId)}</p>}
                   {r.attachments.map((f) => (
                     <AttachmentChip key={f.id} file={f} />
                   ))}
@@ -286,7 +320,7 @@ export function TaskConversation({
                   <Button type="button" size="icon-sm" variant="outline" aria-label="Attach file" onClick={() => replyFileInput.current?.click()}>
                     <Paperclip />
                   </Button>
-                  <MentionComposer value={replyText} onChange={setReplyText} users={users} rows={1} autoFocus placeholder="Write a reply… @ to mention" ariaLabel="Reply" onSubmit={() => sendReply(m.id)} className="min-w-0 flex-1" />
+                  <MentionComposer value={replyText} onChange={setReplyText} users={users} rows={1} autoFocus placeholder="Write a reply… @ to mention" ariaLabel="Reply" onSubmit={() => sendReply(m.id)} onPasteFile={(f) => acceptPasted(f, setReplyFile)} className="min-w-0 flex-1" />
                   <Button type="button" size="sm" onClick={() => sendReply(m.id)} disabled={sending || (!replyText.trim() && !replyFile)}>
                     {sending ? <Loader2 className="animate-spin" /> : <Send />} Reply
                   </Button>
@@ -348,7 +382,7 @@ export function TaskConversation({
             ))}
           </div>
           <span className="hidden text-[11px] text-muted-foreground sm:inline">
-            {kind === "CHAT" ? "Quick messages with everyone on this task" : "Start a topic; people reply underneath"}
+            {kind === "CHAT" ? "Quick messages with everyone on this task" : "Start a topic; people reply underneath · paste images with Ctrl+V"}
           </span>
         </div>
 
@@ -370,7 +404,7 @@ export function TaskConversation({
               <Button type="button" size="icon" variant="outline" aria-label="Attach file" title="Attach a file (max 5 MB)" onClick={() => fileInput.current?.click()}>
                 <Paperclip />
               </Button>
-              <MentionComposer value={content} onChange={setContent} users={users} rows={1} placeholder="Message about this task… @ to mention" ariaLabel="Chat message" onSubmit={sendChat} className="min-w-0 flex-1" />
+              <MentionComposer value={content} onChange={setContent} users={users} rows={1} placeholder="Message about this task… @ to mention" ariaLabel="Chat message" onSubmit={sendChat} onPasteFile={(f) => acceptPasted(f, setFile)} className="min-w-0 flex-1" />
               <Button type="button" onClick={sendChat} disabled={sending || (!content.trim() && !file)} aria-label="Send">
                 {sending ? <Loader2 className="animate-spin" /> : <Send />} Send
               </Button>
@@ -380,7 +414,7 @@ export function TaskConversation({
         ) : (
           <div className="space-y-2">
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New topic title" maxLength={160} aria-label="New topic title" />
-            <MentionComposer value={content} onChange={setContent} users={users} rows={2} placeholder="Details (optional) · @ to mention" ariaLabel="Discussion details" onSubmit={startTopic} />
+            <MentionComposer value={content} onChange={setContent} users={users} rows={2} placeholder="Details (optional) · @ to mention · paste an image with Ctrl+V" ariaLabel="Discussion details" onSubmit={startTopic} onPasteFile={(f) => acceptPasted(f, setFile)} />
             {file && (
               <PendingFile
                 file={file}

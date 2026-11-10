@@ -27,7 +27,6 @@ import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
 import { BrandLogo, BrandMark } from "@/components/shared/brand-logo";
 import { UserMenu } from "@/components/layout/user-menu";
-import { NavLinkIcon } from "@/components/layout/nav-pending";
 import { ProjectDialog, type ProjectFormValues } from "@/components/projects/project-dialog";
 import { WorkspaceDialog } from "@/components/projects/workspace-dialog";
 import type { UserOption } from "@/components/shared/user-multi-select";
@@ -35,9 +34,6 @@ import type { CurrentUser } from "@/lib/auth-guard";
 
 export type SidebarProject = { id: string; name: string; color: string; status: string; openTasks: number };
 export type SidebarWorkspace = { id: string; name: string; color: string; projects: SidebarProject[] };
-
-/** Section links shown to managers; team members navigate through their workspaces only. */
-const MANAGER_NAV = [{ title: "Projects", href: "/my-projects", icon: FolderKanban }];
 
 /**
  * Workspace-area navigation: the section pages on top, then every project the
@@ -79,22 +75,6 @@ export function MemberSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        {canManage && (
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {MANAGER_NAV.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton isActive={isActive(item.href)} tooltip={item.title} render={<Link href={item.href} />}>
-                      <NavLinkIcon icon={item.icon} />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Workspaces</SidebarGroupLabel>

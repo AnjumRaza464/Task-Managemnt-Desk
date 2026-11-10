@@ -1,17 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Building2, FolderKanban, ListTodo } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Building2, Files, FolderKanban, FolderPlus, LayoutDashboard, ListTodo, Plus } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -19,29 +22,57 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
 import { BrandLogo, BrandMark } from "@/components/shared/brand-logo";
 import { UserMenu } from "@/components/layout/user-menu";
+import { NavLinkIcon } from "@/components/layout/nav-pending";
+import { ProjectDialog, type ProjectFormValues } from "@/components/projects/project-dialog";
+import { WorkspaceDialog } from "@/components/projects/workspace-dialog";
+import type { UserOption } from "@/components/shared/user-multi-select";
 import type { CurrentUser } from "@/lib/auth-guard";
 
 export type SidebarProject = { id: string; name: string; color: string; status: string; openTasks: number };
 export type SidebarWorkspace = { id: string; name: string; color: string; projects: SidebarProject[] };
 
+const NAV = [
+  { title: "Dashboard", href: "/my-tasks", icon: LayoutDashboard, managers: false },
+  { title: "Projects", href: "/my-projects", icon: FolderKanban, managers: true },
+  { title: "Files", href: "/my-files", icon: Files, managers: false },
+];
+
 /**
- * Member navigation: their pages on top, then every project they belong to,
- * grouped by workspace (like the reference WorkHub layout).
+ * Workspace-area navigation: the section pages on top, then every project the
+ * user belongs to, grouped by workspace (like the reference WorkHub layout).
+ * Managers see every workspace and can create workspaces and projects from here.
  */
-export function MemberSidebar({ user, workspaces, canManage = false }: { user: CurrentUser; workspaces: SidebarWorkspace[]; canManage?: boolean }) {
+export function MemberSidebar({
+  user,
+  workspaces,
+  canManage = false,
+  users = [],
+}: {
+  user: CurrentUser;
+  workspaces: SidebarWorkspace[];
+  canManage?: boolean;
+  /** People a manager can add to a new project. */
+  users?: UserOption[];
+}) {
   const pathname = usePathname();
+  const router = useRouter();
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+
+  const [wsDialogOpen, setWsDialogOpen] = useState(false);
+  const [projectDialog, setProjectDialog] = useState<{ open: boolean; defaults: Partial<ProjectFormValues> }>({ open: false, defaults: {} });
+  const wsOptions = workspaces.map((w) => ({ id: w.id, name: w.name, color: w.color }));
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/my-tasks" />} className="data-[state=open]:bg-sidebar-accent">
+            <SidebarMenuButton size="lg" render={<Link href={canManage ? "/my-projects" : "/my-tasks"} />} className="data-[state=open]:bg-sidebar-accent">
               <BrandMark className="hidden group-data-[collapsible=icon]:block" />
               <BrandLogo className="h-9 group-data-[collapsible=icon]:hidden" />
               <span className="sr-only">{APP_NAME}</span>
@@ -51,19 +82,44 @@ export function MemberSidebar({ user, workspaces, canManage = false }: { user: C
       </SidebarHeader>
 
       <SidebarContent>
-        {workspaces.length === 0 ? (
-          <SidebarGroup>
-            <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-                {canManage ? "No workspaces yet. Create one from the Projects page." : "You are not in any project yet."}
-              </p>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ) : (
-          <SidebarGroup>
-            <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
-            <SidebarGroupContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {NAV.filter((item) => !canManage || item.managers).map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton isActive={isActive(item.href)} tooltip={item.title} render={<Link href={item.href} />}>
+                    <NavLinkIcon icon={item.icon} />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
+          {canManage && (
+            <SidebarGroupAction title="New workspace" onClick={() => setWsDialogOpen(true)}>
+              <FolderPlus />
+              <span className="sr-only">New workspace</span>
+            </SidebarGroupAction>
+          )}
+          <SidebarGroupContent>
+            {workspaces.length === 0 ? (
+              <div className="px-2 group-data-[collapsible=icon]:hidden">
+                {canManage ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">No workspaces yet. Create one and add projects to it.</p>
+                    <Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => setWsDialogOpen(true)}>
+                      <FolderPlus /> New workspace
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">You are not in any project yet.</p>
+                )}
+              </div>
+            ) : (
               <SidebarMenu className="gap-3">
                 {workspaces.map((ws) => {
                   const wsActive = ws.projects.some((p) => isActive(`/my-projects/${p.id}`));
@@ -85,6 +141,16 @@ export function MemberSidebar({ user, workspaces, canManage = false }: { user: C
                           </span>
                         </span>
                       </SidebarMenuButton>
+                      {canManage && (
+                        <SidebarMenuAction
+                          title={`New project in ${ws.name}`}
+                          className="right-2"
+                          onClick={() => setProjectDialog({ open: true, defaults: { workspaceId: ws.id } })}
+                        >
+                          <Plus />
+                          <span className="sr-only">New project in {ws.name}</span>
+                        </SidebarMenuAction>
+                      )}
 
                       {/* Its projects, indented under a connector line. */}
                       <SidebarMenuSub className="mt-1 gap-0.5 border-l-2" style={{ borderLeftColor: ws.color }}>
@@ -104,20 +170,46 @@ export function MemberSidebar({ user, workspaces, canManage = false }: { user: C
                             </SidebarMenuSubItem>
                           );
                         })}
+                        {canManage && ws.projects.length === 0 && (
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<button type="button" />}
+                              className="h-8 w-full text-muted-foreground"
+                              onClick={() => setProjectDialog({ open: true, defaults: { workspaceId: ws.id } })}
+                            >
+                              <Plus className="size-4" />
+                              <span className="flex-1 truncate">New project</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        )}
                       </SidebarMenuSub>
                     </SidebarMenuItem>
                   );
                 })}
               </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>
         <UserMenu user={user} settingsHref={canManage ? "/settings" : null} notificationsHref="/my-notifications" />
       </SidebarFooter>
       <SidebarRail />
+
+      {canManage && (
+        <>
+          <WorkspaceDialog open={wsDialogOpen} onOpenChange={setWsDialogOpen} />
+          <ProjectDialog
+            open={projectDialog.open}
+            onOpenChange={(o) => setProjectDialog((d) => ({ ...d, open: o }))}
+            defaults={projectDialog.defaults}
+            workspaces={wsOptions}
+            users={users}
+            onSaved={(id) => router.push(`/my-projects/${id}`)}
+          />
+        </>
+      )}
     </Sidebar>
   );
 }

@@ -1,6 +1,7 @@
 import { requireMemberPage } from "@/lib/auth-guard";
 import { getUnreadNotificationCount } from "@/lib/queries/notifications";
 import { getMyProjects, getWorkspacesOverview } from "@/lib/queries/projects";
+import { getAssignableUsers } from "@/lib/queries/users";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { MemberHeader } from "@/components/layout/member-header";
 import { MemberSidebar, type SidebarWorkspace } from "@/components/layout/member-sidebar";
@@ -10,10 +11,12 @@ import { InstallBanner } from "@/components/pwa/install-banner";
 export default async function MemberLayout({ children }: LayoutProps<"/">) {
   const user = await requireMemberPage();
   const isManager = user.role === "MANAGER";
-  const [unreadNotifications, projects, all] = await Promise.all([
+  const [unreadNotifications, projects, all, users] = await Promise.all([
     getUnreadNotificationCount(user.id),
     isManager ? Promise.resolve([]) : getMyProjects(user.id),
     isManager ? getWorkspacesOverview(user) : Promise.resolve([]),
+    // Managers can create projects from the sidebar, so they need the people picker.
+    isManager ? getAssignableUsers() : Promise.resolve([]),
   ]);
 
   const workspaces: SidebarWorkspace[] = [];
@@ -45,7 +48,7 @@ export default async function MemberLayout({ children }: LayoutProps<"/">) {
 
   return (
     <SidebarProvider>
-      <MemberSidebar user={user} workspaces={workspaces} canManage={isManager} />
+      <MemberSidebar user={user} workspaces={workspaces} canManage={isManager} users={users} />
       <SidebarInset>
         <MemberHeader unreadCount={unreadNotifications} projectNames={names} />
         <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">

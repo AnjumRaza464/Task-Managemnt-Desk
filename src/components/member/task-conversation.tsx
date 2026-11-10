@@ -66,38 +66,61 @@ function ImageAttachment({ file, href, mine }: { file: TaskMessageAttachment; hr
   );
 }
 
-/** Picked-file chip shown above a composer. */
-function PendingFile({ file, onClear }: { file: File; onClear: () => void }) {
+/** Picked / pasted files waiting above a composer, each removable. */
+function PendingFiles({ files, onRemove }: { files: File[]; onRemove: (index: number) => void }) {
+  if (files.length === 0) return null;
   return (
-    <div className="mb-2 flex items-center gap-2 rounded-lg border bg-muted/40 px-2 py-1 text-xs">
-      {file.type.startsWith("image/") ? <ImageIcon className="size-3.5" /> : <Paperclip className="size-3.5" />}
-      <span className="truncate">{file.name}</span>
-      <span className="text-muted-foreground">{formatBytes(file.size)}</span>
-      <button type="button" className="ml-auto" aria-label="Remove file" onClick={onClear}>
-        <X className="size-3" />
-      </button>
+    <div className="mb-2 flex flex-wrap gap-1.5">
+      {files.map((file, i) => (
+        <div key={`${file.name}-${file.size}-${i}`} className="flex max-w-full items-center gap-1.5 rounded-lg border bg-muted/40 px-2 py-1 text-xs">
+          {file.type.startsWith("image/") ? <ImageIcon className="size-3.5 shrink-0" /> : <Paperclip className="size-3.5 shrink-0" />}
+          <span className="truncate">{file.name}</span>
+          <span className="shrink-0 text-muted-foreground">{formatBytes(file.size)}</span>
+          <button type="button" className="ml-1 shrink-0" aria-label={`Remove ${file.name}`} onClick={() => onRemove(i)}>
+            <X className="size-3" />
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
 
-function pickFile(e: React.ChangeEvent<HTMLInputElement>, set: (f: File | null) => void) {
-  const f = e.target.files?.[0] ?? null;
-  if (f && f.size > MAX_ATTACHMENT_BYTES) {
-    toast.error("File is larger than 5 MB.");
-    e.target.value = "";
-    return;
+const MAX_FILES_PER_MESSAGE = 10;
+
+/**
+ * Adds picked or pasted files to the pending list. One message may carry up
+ * to 10 files and 5 MB in total (the server-action body limit), each under 5 MB.
+ */
+function mergeFiles(current: File[], incoming: File[]): File[] {
+  const next = [...current];
+  for (const f of incoming) {
+    if (f.size > MAX_ATTACHMENT_BYTES) {
+      toast.error(`"${f.name}" is larger than 5 MB.`);
+      continue;
+    }
+    if (next.length >= MAX_FILES_PER_MESSAGE) {
+      toast.error(`Up to ${MAX_FILES_PER_MESSAGE} files per message.`);
+      break;
+    }
+    if (next.reduce((n, x) => n + x.size, 0) + f.size > MAX_ATTACHMENT_BYTES) {
+      toast.error("All files of one message together must stay under 5 MB.");
+      break;
+    }
+    next.push(f);
   }
-  set(f);
+  return next;
 }
 
-/** An image pasted with Ctrl+V becomes the pending attachment, like a picked file. */
-function acceptPasted(file: File, set: (f: File | null) => void) {
-  if (file.size > MAX_ATTACHMENT_BYTES) {
-    toast.error("Pasted image is larger than 5 MB.");
-    return;
-  }
-  set(file);
-  toast.success("Image attached");
+function pickFiles(e: React.ChangeEvent<HTMLInputElement>, add: (files: File[]) => void) {
+  const list = Array.from(e.target.files ?? []);
+  e.target.value = "";
+  if (list.length) add(list);
+}
+
+/** Images pasted with Ctrl+V become pending attachments, like picked files. */
+function acceptPasted(files: File[], add: (files: File[]) => void) {
+  add(files);
+  toast.success(files.length === 1 ? "Image attached" : `${files.length} images attached`);
 }
 
 /**
@@ -127,11 +150,13 @@ export function TaskConversation({
   // chat composer / topic composer
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   // reply composer (discussion)
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
-  const [replyFile, setReplyFile] = useState<File | null>(null);
+  const [replyFiles, setReplyFiles] = useState<File[]>([]);
+  const addFiles = (incoming: File[]) => setFiles(mergeFiles(files, incoming));
+  const addReplyFiles = (incoming: File[]) => setReplyFiles(mergeFiles(replyFiles, incoming));
   const [sending, startSend] = useTransition();
   const fileInput = useRef<HTMLInputElement>(null);
   const replyFileInput = useRef<HTMLInputElement>(null);
@@ -173,7 +198,7 @@ export function TaskConversation({
     if (el && kind === "CHAT") el.scrollTop = el.scrollHeight;
   }, [count, kind]);
 
-  function submit(fields: { title?: string; content: string; parentId?: string; file: File | null }, after: () => void) {
+  function submit(fields: { title?: string; content: string; parentId?: string; files: File[] }, after: () => void) {
     const text = fields.content.trim();
     const fd = new FormData();
     fd.set("taskId", taskId);
@@ -182,7 +207,7 @@ export function TaskConversation({
     fd.set("mentionIds", JSON.stringify(mentionedIds(text, users)));
     if (fields.title) fd.set("title", fields.title.trim());
     if (fields.parentId) fd.set("parentId", fields.parentId);
-    if (fields.file) fd.set("file", fields.file);
+    for (const f of fields.files) fd.append("file", f);
     startSend(async () => {
       const result = await postTaskMessage(fd);
       if (!result.ok) {
@@ -196,10 +221,10 @@ export function TaskConversation({
   }
 
   function sendChat() {
-    if (!content.trim() && !file) return;
-    submit({ content, file }, () => {
+    if (!content.trim() && files.length === 0) return;
+    submit({ content, files }, () => {
       setContent("");
-      setFile(null);
+      setFiles([]);
       if (fileInput.current) fileInput.current.value = "";
     });
   }
@@ -209,20 +234,20 @@ export function TaskConversation({
       toast.error("Give the discussion a topic title.");
       return;
     }
-    submit({ title, content, file }, () => {
+    submit({ title, content, files }, () => {
       setTitle("");
       setContent("");
-      setFile(null);
+      setFiles([]);
       if (fileInput.current) fileInput.current.value = "";
       toast.success("Discussion started");
     });
   }
 
   function sendReply(parentId: string) {
-    if (!replyText.trim() && !replyFile) return;
-    submit({ content: replyText, parentId, file: replyFile }, () => {
+    if (!replyText.trim() && replyFiles.length === 0) return;
+    submit({ content: replyText, parentId, files: replyFiles }, () => {
       setReplyText("");
-      setReplyFile(null);
+      setReplyFiles([]);
       setReplyTo(null);
       if (replyFileInput.current) replyFileInput.current.value = "";
     });
@@ -306,22 +331,14 @@ export function TaskConversation({
           <div className="mt-3">
             {open ? (
               <div className="space-y-2 rounded-lg bg-muted/40 p-2">
-                {replyFile && (
-                  <PendingFile
-                    file={replyFile}
-                    onClear={() => {
-                      setReplyFile(null);
-                      if (replyFileInput.current) replyFileInput.current.value = "";
-                    }}
-                  />
-                )}
+                <PendingFiles files={replyFiles} onRemove={(i) => setReplyFiles((prev) => prev.filter((_, j) => j !== i))} />
                 <div className="flex items-end gap-2">
-                  <input ref={replyFileInput} type="file" className="hidden" onChange={(e) => pickFile(e, setReplyFile)} aria-label="Attach a file to the reply" />
-                  <Button type="button" size="icon-sm" variant="outline" aria-label="Attach file" onClick={() => replyFileInput.current?.click()}>
+                  <input ref={replyFileInput} type="file" multiple className="hidden" onChange={(e) => pickFiles(e, addReplyFiles)} aria-label="Attach files to the reply" />
+                  <Button type="button" size="icon-sm" variant="outline" aria-label="Attach files" onClick={() => replyFileInput.current?.click()}>
                     <Paperclip />
                   </Button>
-                  <MentionComposer value={replyText} onChange={setReplyText} users={users} rows={1} autoFocus placeholder="Write a reply… @ to mention" ariaLabel="Reply" onSubmit={() => sendReply(m.id)} onPasteFile={(f) => acceptPasted(f, setReplyFile)} className="min-w-0 flex-1" />
-                  <Button type="button" size="sm" onClick={() => sendReply(m.id)} disabled={sending || (!replyText.trim() && !replyFile)}>
+                  <MentionComposer value={replyText} onChange={setReplyText} users={users} rows={1} autoFocus placeholder="Write a reply… @ to mention" ariaLabel="Reply" onSubmit={() => sendReply(m.id)} onPasteFiles={(fs) => acceptPasted(fs, addReplyFiles)} className="min-w-0 flex-1" />
+                  <Button type="button" size="sm" onClick={() => sendReply(m.id)} disabled={sending || (!replyText.trim() && replyFiles.length === 0)}>
                     {sending ? <Loader2 className="animate-spin" /> : <Send />} Reply
                   </Button>
                   <Button type="button" size="icon-sm" variant="ghost" aria-label="Cancel reply" onClick={() => setReplyTo(null)}>
@@ -390,44 +407,28 @@ export function TaskConversation({
           <p className="text-xs text-muted-foreground">You can read this conversation but not post in it.</p>
         ) : kind === "CHAT" ? (
           <>
-            {file && (
-              <PendingFile
-                file={file}
-                onClear={() => {
-                  setFile(null);
-                  if (fileInput.current) fileInput.current.value = "";
-                }}
-              />
-            )}
+            <PendingFiles files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, j) => j !== i))} />
             <div className="flex items-end gap-2">
-              <input ref={fileInput} type="file" className="hidden" onChange={(e) => pickFile(e, setFile)} aria-label="Attach a file" />
-              <Button type="button" size="icon" variant="outline" aria-label="Attach file" title="Attach a file (max 5 MB)" onClick={() => fileInput.current?.click()}>
+              <input ref={fileInput} type="file" multiple className="hidden" onChange={(e) => pickFiles(e, addFiles)} aria-label="Attach files" />
+              <Button type="button" size="icon" variant="outline" aria-label="Attach files" title="Attach files (max 5 MB per message)" onClick={() => fileInput.current?.click()}>
                 <Paperclip />
               </Button>
-              <MentionComposer value={content} onChange={setContent} users={users} rows={1} placeholder="Message about this task… @ to mention" ariaLabel="Chat message" onSubmit={sendChat} onPasteFile={(f) => acceptPasted(f, setFile)} className="min-w-0 flex-1" />
-              <Button type="button" onClick={sendChat} disabled={sending || (!content.trim() && !file)} aria-label="Send">
+              <MentionComposer value={content} onChange={setContent} users={users} rows={1} placeholder="Message about this task… @ to mention" ariaLabel="Chat message" onSubmit={sendChat} onPasteFiles={(fs) => acceptPasted(fs, addFiles)} className="min-w-0 flex-1" />
+              <Button type="button" onClick={sendChat} disabled={sending || (!content.trim() && files.length === 0)} aria-label="Send">
                 {sending ? <Loader2 className="animate-spin" /> : <Send />} Send
               </Button>
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Ctrl+Enter to send · files up to 5 MB are saved with the task</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">Ctrl+Enter to send · attach several files (5 MB per message); they are saved with the task</p>
           </>
         ) : (
           <div className="space-y-2">
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New topic title" maxLength={160} aria-label="New topic title" />
-            <MentionComposer value={content} onChange={setContent} users={users} rows={2} placeholder="Details (optional) · @ to mention · paste an image with Ctrl+V" ariaLabel="Discussion details" onSubmit={startTopic} onPasteFile={(f) => acceptPasted(f, setFile)} />
-            {file && (
-              <PendingFile
-                file={file}
-                onClear={() => {
-                  setFile(null);
-                  if (fileInput.current) fileInput.current.value = "";
-                }}
-              />
-            )}
+            <MentionComposer value={content} onChange={setContent} users={users} rows={2} placeholder="Details (optional) · @ to mention · paste an image with Ctrl+V" ariaLabel="Discussion details" onSubmit={startTopic} onPasteFiles={(fs) => acceptPasted(fs, addFiles)} />
+            <PendingFiles files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, j) => j !== i))} />
             <div className="flex items-center gap-2">
-              <input ref={fileInput} type="file" className="hidden" onChange={(e) => pickFile(e, setFile)} aria-label="Attach a file" />
+              <input ref={fileInput} type="file" multiple className="hidden" onChange={(e) => pickFiles(e, addFiles)} aria-label="Attach files" />
               <Button type="button" size="sm" variant="outline" onClick={() => fileInput.current?.click()}>
-                <Paperclip /> Attach file
+                <Paperclip /> Attach files
               </Button>
               <Button type="button" size="sm" className="ml-auto" onClick={startTopic} disabled={sending || !title.trim()}>
                 {sending ? <Loader2 className="animate-spin" /> : <MessagesSquare />} Start discussion

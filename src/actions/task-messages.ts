@@ -54,9 +54,13 @@ type Row = {
 
 const toDto = (c: Row): TaskMessage => ({ ...c, createdAt: c.createdAt.toISOString() });
 
+const MAX_FILES_PER_MESSAGE = 10;
+
 /**
- * Posts a chat message or a discussion comment on a task, optionally with one
- * attached file (stored with the task's attachments too).
+ * Posts a chat message or a discussion comment on a task, optionally with
+ * attached files (stored with the task's attachments too). All files of one
+ * message together must stay under the attachment limit so the request fits
+ * the server-action body limit.
  */
 export async function postTaskMessage(formData: FormData) {
   return runAction(async () => {
@@ -68,15 +72,19 @@ export async function postTaskMessage(formData: FormData) {
       content: String(formData.get("content") ?? ""),
       mentionIds: JSON.parse(String(formData.get("mentionIds") ?? "[]")),
     });
-    const file = formData.get("file");
-    const hasFile = file instanceof File && file.size > 0;
+    const files = formData.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
+    const hasFile = files.length > 0;
     const isTopic = values.kind === "DISCUSSION" && !values.parentId;
     if (isTopic && !values.title) throw new ActionError("Give the discussion a topic title.");
     if (!isTopic && !values.content && !hasFile) throw new ActionError("Write a message or attach a file.");
-    if (hasFile) {
-      if (file.size > MAX_ATTACHMENT_BYTES) throw new ActionError("File is larger than 5 MB.");
-      if (BLOCKED_EXTENSIONS.test(file.name)) throw new ActionError("This file type is not allowed.");
+    if (files.length > MAX_FILES_PER_MESSAGE) throw new ActionError(`Attach up to ${MAX_FILES_PER_MESSAGE} files per message.`);
+    let totalBytes = 0;
+    for (const file of files) {
+      if (file.size > MAX_ATTACHMENT_BYTES) throw new ActionError(`"${file.name}" is larger than 5 MB.`);
+      if (BLOCKED_EXTENSIONS.test(file.name)) throw new ActionError(`"${file.name}" is not an allowed file type.`);
+      totalBytes += file.size;
     }
+    if (totalBytes > MAX_ATTACHMENT_BYTES) throw new ActionError("All files of one message together must stay under 5 MB.");
 
     const { user } = await requireTaskAccess(values.taskId, "canComment");
     const task = await prisma.task.findUnique({
@@ -98,8 +106,9 @@ export async function postTaskMessage(formData: FormData) {
     const mentioned = mentionIds.length
       ? await prisma.user.findMany({ where: { id: { in: mentionIds }, isActive: true }, select: { id: true, name: true } })
       : [];
-    const bytes = hasFile ? Buffer.from(await file.arrayBuffer()) : null;
-    const label = isTopic ? values.title! : hasFile && !values.content ? `📎 ${file.name}` : values.content;
+    const uploads = await Promise.all(files.map(async (file) => ({ file, bytes: Buffer.from(await file.arrayBuffer()) })));
+    const fileLabel = files.length === 1 ? `📎 ${files[0].name}` : `📎 ${files.length} files`;
+    const label = isTopic ? values.title! : hasFile && !values.content ? fileLabel : values.content;
     const excerpt = label.slice(0, 80);
 
     const message = await prisma.$transaction(async (tx) => {
@@ -112,17 +121,17 @@ export async function postTaskMessage(formData: FormData) {
           authorId: user.id,
           content: values.content,
           mentions: { create: mentioned.map((m) => ({ userId: m.id })) },
-          ...(hasFile && bytes
+          ...(hasFile
             ? {
                 attachments: {
-                  create: {
+                  create: uploads.map(({ file, bytes }) => ({
                     taskId: task.id,
                     uploadedById: user.id,
                     fileName: file.name.slice(0, 200),
                     mimeType: file.type || "application/octet-stream",
                     size: file.size,
                     data: bytes,
-                  },
+                  })),
                 },
               }
             : {}),
@@ -138,7 +147,7 @@ export async function postTaskMessage(formData: FormData) {
           entityId: created.id,
           taskId: task.id,
           projectId: task.projectId,
-          details: { excerpt, file: hasFile ? file.name : undefined },
+          details: { excerpt, file: hasFile ? files.map((f) => f.name).join(", ") : undefined },
         },
         tx,
       );

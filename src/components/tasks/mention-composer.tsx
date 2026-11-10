@@ -21,7 +21,7 @@ export function MentionComposer({
   disabled,
   autoFocus,
   onSubmit,
-  onPasteFile,
+  onPasteFiles,
   className,
   ariaLabel,
 }: {
@@ -33,8 +33,8 @@ export function MentionComposer({
   disabled?: boolean;
   autoFocus?: boolean;
   onSubmit?: () => void;
-  /** Called with an image pasted from the clipboard (Ctrl+V) instead of inserting it as text. */
-  onPasteFile?: (file: File) => void;
+  /** Called with the images pasted from the clipboard (Ctrl+V) instead of inserting them as text. */
+  onPasteFiles?: (files: File[]) => void;
   className?: string;
   ariaLabel?: string;
 }) {
@@ -96,11 +96,11 @@ export function MentionComposer({
         onClick={(e) => detect(value, e.currentTarget.selectionStart ?? value.length)}
         onBlur={() => setTimeout(() => setQuery(null), 150)}
         onPaste={(e) => {
-          if (!onPasteFile) return;
-          const file = pastedImage(e.clipboardData);
-          if (!file) return;
+          if (!onPasteFiles) return;
+          const files = pastedImages(e.clipboardData);
+          if (files.length === 0) return;
           e.preventDefault();
-          onPasteFile(file);
+          onPasteFiles(files);
         }}
         onKeyDown={(e) => {
           if (open) {
@@ -161,14 +161,19 @@ export function MentionComposer({
   );
 }
 
-/** The first image in a paste (e.g. a screenshot or a copied picture), named so it is recognisable in the file list. */
-function pastedImage(data: DataTransfer): File | null {
-  const item = Array.from(data.items).find((i) => i.kind === "file" && i.type.startsWith("image/"));
-  const file = item?.getAsFile();
-  if (!file) return null;
-  const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+/** The images in a paste (screenshots, copied pictures), named so they are recognisable in the file list. */
+function pastedImages(data: DataTransfer): File[] {
   const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15);
-  return new File([file], `pasted-image-${stamp}.${ext}`, { type: file.type });
+  const out: File[] = [];
+  for (const item of Array.from(data.items)) {
+    if (item.kind !== "file" || !item.type.startsWith("image/")) continue;
+    const file = item.getAsFile();
+    if (!file) continue;
+    const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+    const suffix = out.length ? `-${out.length + 1}` : "";
+    out.push(new File([file], `pasted-image-${stamp}${suffix}.${ext}`, { type: file.type }));
+  }
+  return out;
 }
 
 const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

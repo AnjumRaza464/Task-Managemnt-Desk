@@ -13,18 +13,20 @@ export const metadata: Metadata = { title: "Settings" };
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const manager = await requireManagerPage();
   const params = await searchParams;
-  const tabs = ["profile", "security", "categories", "appearance"] as const;
-  const initial = tabs.includes(params.tab as (typeof tabs)[number]) ? (params.tab as string) : "profile";
-  const categories = await getCategories();
+  const isAdmin = manager.role === "ADMIN";
+  // Categories are an admin-panel concept; managers manage their account and appearance only.
+  const tabs = isAdmin ? ["profile", "security", "categories", "appearance"] : ["profile", "security", "appearance"];
+  const initial = tabs.includes(params.tab as string) ? (params.tab as string) : "profile";
+  const categories = isAdmin ? await getCategories() : [];
 
   return (
     <>
-      <PageHeader title="Settings" description="Your account, task categories and appearance." />
+      <PageHeader title="Settings" description={isAdmin ? "Your account, task categories and appearance." : "Your account and appearance."} />
       <Tabs defaultValue={initial} className="gap-6">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
+          {isAdmin && <TabsTrigger value="categories">Categories</TabsTrigger>}
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
         </TabsList>
         <TabsContent value="profile">
@@ -33,9 +35,11 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         <TabsContent value="security">
           <PasswordForm />
         </TabsContent>
-        <TabsContent value="categories">
-          <CategoryManager categories={categories} />
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="categories">
+            <CategoryManager categories={categories} />
+          </TabsContent>
+        )}
         <TabsContent value="appearance">
           <AppearanceSettings />
         </TabsContent>

@@ -3,13 +3,17 @@ import { getUnreadNotificationCount } from "@/lib/queries/notifications";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
+import { WorkspaceShell } from "@/components/layout/workspace-shell";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { InstallBanner } from "@/components/pwa/install-banner";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const manager = await requireManagerPage();
-  const unreadCount = await getUnreadNotificationCount(manager.id);
 
+  // Managers only reach a few admin-panel pages (Settings); they keep their workspace sidebar there.
+  if (manager.role === "MANAGER") return <WorkspaceShell user={manager}>{children}</WorkspaceShell>;
+
+  const unreadCount = await getUnreadNotificationCount(manager.id);
   return (
     <SidebarProvider>
       <AppSidebar user={manager} unreadCount={unreadCount} />

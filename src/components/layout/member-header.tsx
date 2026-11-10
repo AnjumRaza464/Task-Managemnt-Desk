@@ -16,6 +16,7 @@ const TITLES: Array<[string, string]> = [
   ["/my-projects", "Projects"],
   ["/my-files", "Files"],
   ["/my-notifications", "Notifications"],
+  ["/settings", "Settings"],
 ];
 
 export function MemberHeader({ unreadCount, projectNames }: { unreadCount: number; projectNames: Record<string, string> }) {

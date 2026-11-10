@@ -38,6 +38,7 @@ import { AssigneeAvatars } from "@/components/shared/assignee-avatars";
 import { PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TaskFormDialog, taskToFormValues, type TaskFormValues } from "@/components/tasks/task-form-dialog";
+import { TaskModal } from "@/components/member/task-modal";
 import { STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import type { ProjectTask } from "@/lib/queries/projects";
@@ -79,6 +80,8 @@ export function ProjectBoard({
   const [editing, setEditing] = useState<TaskFormValues | null>(null);
   const [creatingIn, setCreatingIn] = useState<string | null | false>(false);
   const [deleting, setDeleting] = useState<ProjectTask | null>(null);
+  // Clicking a card opens the task in the same modal (details + chat) the workspace area uses.
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [deletingList, setDeletingList] = useState<ListRow | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [addingList, setAddingList] = useState(false);
@@ -260,6 +263,7 @@ export function ProjectBoard({
                       key={task.id}
                       task={task}
                       href={`${taskHref}/${task.id}`}
+                      onOpen={() => setOpenTaskId(task.id)}
                       lists={lists}
                       draggable={canMove(task)}
                       dragging={dragId === task.id}
@@ -322,6 +326,7 @@ export function ProjectBoard({
         )}
       </div>
 
+      <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && setOpenTaskId(null)} users={options.users} taskHref={taskHref} options={options} />
       <TaskFormDialog
         open={Boolean(editing)}
         onOpenChange={(o) => !o && setEditing(null)}
@@ -383,9 +388,12 @@ function BoardCard({
   onStatus,
   onEdit,
   onDelete,
+  onOpen,
 }: {
   task: ProjectTask;
   href: string;
+  /** Opens the task modal; the "View details" menu item still goes to the full page. */
+  onOpen: () => void;
   lists: ListRow[];
   draggable: boolean;
   dragging: boolean;
@@ -415,9 +423,9 @@ function BoardCard({
       )}
     >
       <div className="flex items-start gap-1">
-        <Link href={href} draggable={false} className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug hover:underline">
+        <button type="button" onClick={onOpen} className="line-clamp-2 min-w-0 flex-1 cursor-pointer text-left text-sm font-medium leading-snug hover:underline">
           {task.title}
-        </Link>
+        </button>
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="-mt-0.5 -mr-1 shrink-0" aria-label="Task actions" />}>
             <MoreHorizontal />

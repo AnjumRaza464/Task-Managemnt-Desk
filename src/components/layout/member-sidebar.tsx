@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, Files, FolderKanban, FolderPlus, LayoutDashboard, ListTodo, Plus } from "lucide-react";
+import { Building2, FolderKanban, FolderPlus, ListTodo, Plus } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -36,11 +36,8 @@ import type { CurrentUser } from "@/lib/auth-guard";
 export type SidebarProject = { id: string; name: string; color: string; status: string; openTasks: number };
 export type SidebarWorkspace = { id: string; name: string; color: string; projects: SidebarProject[] };
 
-const NAV = [
-  { title: "Dashboard", href: "/my-tasks", icon: LayoutDashboard, managers: false },
-  { title: "Projects", href: "/my-projects", icon: FolderKanban, managers: true },
-  { title: "Files", href: "/my-files", icon: Files, managers: false },
-];
+/** Section links shown to managers; team members navigate through their workspaces only. */
+const MANAGER_NAV = [{ title: "Projects", href: "/my-projects", icon: FolderKanban }];
 
 /**
  * Workspace-area navigation: the section pages on top, then every project the
@@ -82,20 +79,22 @@ export function MemberSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV.filter((item) => !canManage || item.managers).map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton isActive={isActive(item.href)} tooltip={item.title} render={<Link href={item.href} />}>
-                    <NavLinkIcon icon={item.icon} />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {canManage && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {MANAGER_NAV.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton isActive={isActive(item.href)} tooltip={item.title} render={<Link href={item.href} />}>
+                      <NavLinkIcon icon={item.icon} />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Workspaces</SidebarGroupLabel>

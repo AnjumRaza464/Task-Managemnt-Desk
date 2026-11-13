@@ -63,12 +63,12 @@ export function MemberSidebar({
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        {/* The logo is a plain brand mark, not a link. */}
-        <div className="flex h-12 items-center px-2">
+        {/* The logo goes back to My tasks, the page shown after signing in. */}
+        <Link href="/my-tasks" className="flex h-12 items-center rounded-md px-2 transition-colors hover:bg-sidebar-accent" aria-label={`${APP_NAME} home`} title="Home">
           <BrandMark className="hidden group-data-[collapsible=icon]:block" />
           <BrandLogo className="h-9 group-data-[collapsible=icon]:hidden" />
           <span className="sr-only">{APP_NAME}</span>
-        </div>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent>

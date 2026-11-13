@@ -5,8 +5,26 @@ import { prisma } from "@/lib/prisma";
 import { UnauthorizedError } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
 import { logActivity, notifyManagers, notifyUsers } from "@/lib/activity";
+import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
 import { getProjectAccess, requireProjectAccess, requireTaskAccess, requireUser } from "@/lib/permissions";
 import { commentSchema } from "@/lib/validations/task";
+
+const BLOCKED_EXTENSIONS = /\.(exe|bat|cmd|sh|msi|dll|js|jar|ps1|vbs)$/i;
+const MAX_FILES_PER_COMMENT = 10;
+
+/** The files appended as "file" to a comment form, checked against the size and type limits. */
+function commentFiles(formData: FormData): File[] {
+  const files = formData.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length > MAX_FILES_PER_COMMENT) throw new ActionError(`Attach up to ${MAX_FILES_PER_COMMENT} files per comment.`);
+  let total = 0;
+  for (const file of files) {
+    if (file.size > MAX_ATTACHMENT_BYTES) throw new ActionError(`"${file.name}" is larger than 5 MB.`);
+    if (BLOCKED_EXTENSIONS.test(file.name)) throw new ActionError(`"${file.name}" is not an allowed file type.`);
+    total += file.size;
+  }
+  if (total > MAX_ATTACHMENT_BYTES) throw new ActionError("All files of one comment together must stay under 5 MB.");
+  return files;
+}
 
 function revalidateComments(taskId: string | null, projectId: string | null) {
   if (taskId) {
@@ -21,14 +39,24 @@ function revalidateComments(taskId: string | null, projectId: string | null) {
 }
 
 /**
- * Posts a comment (or a reply) on a task or in a project discussion.
- * Mentioned people, the parent comment's author, the task's assignees /
- * the project's members and managers are notified, each only once.
+ * Posts a comment (or a reply) on a task or in a project discussion, with
+ * any files appended as "file" (pictures show inline). Mentioned people, the
+ * parent comment's author, the task's assignees / the project's members and
+ * managers are notified, each only once.
  */
-export async function addComment(input: unknown) {
+export async function addComment(formData: FormData) {
   return runAction(async () => {
-    const values = commentSchema.parse(input);
-    const excerpt = values.content.slice(0, 80);
+    const files = commentFiles(formData);
+    const values = commentSchema.parse({
+      taskId: formData.get("taskId") || undefined,
+      projectId: formData.get("projectId") || undefined,
+      parentId: formData.get("parentId") || undefined,
+      content: String(formData.get("content") ?? ""),
+      mentionIds: JSON.parse(String(formData.get("mentionIds") ?? "[]")),
+    });
+    if (!values.content && files.length === 0) throw new ActionError("Write a comment or attach a file.");
+    const fileLabel = files.length === 1 ? `📎 ${files[0].name}` : `📎 ${files.length} files`;
+    const excerpt = (values.content || fileLabel).slice(0, 80);
 
     // Where does the comment go, and may the user post there?
     let user;
@@ -75,6 +103,8 @@ export async function addComment(input: unknown) {
       ? await prisma.user.findMany({ where: { id: { in: mentionIds }, isActive: true }, select: { id: true, name: true } })
       : [];
 
+    const uploads = await Promise.all(files.map(async (file) => ({ file, bytes: Buffer.from(await file.arrayBuffer()) })));
+
     const comment = await prisma.$transaction(async (tx) => {
       const created = await tx.comment.create({
         data: {
@@ -84,6 +114,21 @@ export async function addComment(input: unknown) {
           authorId: user.id,
           content: values.content,
           mentions: { create: mentioned.map((m) => ({ userId: m.id })) },
+          ...(uploads.length
+            ? {
+                attachments: {
+                  create: uploads.map(({ file, bytes }) => ({
+                    taskId: task?.id ?? null,
+                    projectId: task ? null : (project?.id ?? null),
+                    uploadedById: user.id,
+                    fileName: file.name.slice(0, 200),
+                    mimeType: file.type || "application/octet-stream",
+                    size: file.size,
+                    data: bytes,
+                  })),
+                },
+              }
+            : {}),
         },
       });
       await logActivity(
@@ -94,7 +139,7 @@ export async function addComment(input: unknown) {
           entityId: created.id,
           taskId: task?.id ?? null,
           projectId: task?.projectId ?? project?.id ?? null,
-          details: { excerpt, mentions: mentioned.map((m) => m.name) },
+          details: { excerpt, mentions: mentioned.map((m) => m.name), file: files.length ? files.map((f) => f.name).join(", ") : undefined },
         },
         tx,
       );
@@ -195,7 +240,11 @@ export async function deleteComment(id: string) {
     }
     if (!allowed) throw new UnauthorizedError("You can only delete your own comments.");
 
-    await prisma.comment.delete({ where: { id } }); // replies cascade
+    await prisma.$transaction([
+      // Files posted in a project discussion live only in that comment (or its replies); task files stay with the task.
+      prisma.attachment.deleteMany({ where: { taskId: null, OR: [{ commentId: id }, { comment: { parentId: id } }] } }),
+      prisma.comment.delete({ where: { id } }), // replies cascade
+    ]);
     await logActivity({
       actorId: user.id,
       action: "COMMENT_DELETED",

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { UnauthorizedError } from "@/lib/auth-guard";
-import { requireTaskAccess } from "@/lib/permissions";
+import { requireProjectAccess, requireTaskAccess } from "@/lib/permissions";
 import { ActionError, runAction } from "@/lib/action-result";
 import { logActivity } from "@/lib/activity";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
@@ -55,11 +55,16 @@ export async function deleteAttachment(id: string) {
   return runAction(async () => {
     const attachment = await prisma.attachment.findUnique({
       where: { id },
-      select: { id: true, taskId: true, fileName: true, uploadedById: true },
+      select: { id: true, taskId: true, projectId: true, fileName: true, uploadedById: true },
     });
     if (!attachment) throw new ActionError("Attachment not found.");
-    const { user: manager, access } = await requireTaskAccess(attachment.taskId, "canEdit");
-    if (attachment.uploadedById !== manager.id && !access.canManage) {
+    // A task file: project members may remove their own, managers any. A project discussion file: the same, within the project.
+    const { user: manager, canManage } = attachment.taskId
+      ? await requireTaskAccess(attachment.taskId, "canEdit").then((r) => ({ user: r.user, canManage: r.access.canManage }))
+      : attachment.projectId
+        ? await requireProjectAccess(attachment.projectId, "comment").then((r) => ({ user: r.user, canManage: r.access.canManage }))
+        : await requireProjectAccess("", "manage").then((r) => ({ user: r.user, canManage: r.access.canManage }));
+    if (attachment.uploadedById !== manager.id && !canManage) {
       throw new UnauthorizedError("You can only remove files you uploaded.");
     }
     await prisma.attachment.delete({ where: { id } });
@@ -69,10 +74,17 @@ export async function deleteAttachment(id: string) {
       entity: "Attachment",
       entityId: id,
       taskId: attachment.taskId,
+      projectId: attachment.projectId,
       details: { fileName: attachment.fileName },
     });
-    revalidatePath(`/tasks/${attachment.taskId}`);
-    revalidatePath(`/my-tasks/${attachment.taskId}`);
+    if (attachment.taskId) {
+      revalidatePath(`/tasks/${attachment.taskId}`);
+      revalidatePath(`/my-tasks/${attachment.taskId}`);
+    }
+    if (attachment.projectId) {
+      revalidatePath(`/projects/${attachment.projectId}`);
+      revalidatePath(`/my-projects/${attachment.projectId}`);
+    }
     return undefined;
   });
 }

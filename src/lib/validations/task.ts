@@ -111,7 +111,8 @@ export const commentSchema = z
     taskId: z.string().min(1).optional(),
     projectId: z.string().min(1).optional(),
     parentId: z.string().min(1).optional(),
-    content: z.string().trim().min(1, "Comment cannot be empty").max(2000),
+    /** May be empty when the comment only carries files (the action checks that). */
+    content: z.string().trim().max(2000),
     mentionIds: z.array(z.string().min(1)).max(25).default([]),
   })
   .refine((v) => Boolean(v.taskId) !== Boolean(v.projectId), { message: "A comment belongs to a task or a project", path: ["taskId"] });

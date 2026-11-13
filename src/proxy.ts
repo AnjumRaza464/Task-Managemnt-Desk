@@ -44,7 +44,8 @@ export default auth((req) => {
   const isAdmin = role === "ADMIN";
   const isManager = role === "MANAGER";
   const isMember = !isAdmin;
-  const home = isAdmin ? "/dashboard" : isManager ? "/my-projects" : MEMBER_PREFIX;
+  // The same page the sign-in lands on: admins get the dashboard, managers and members their tasks.
+  const home = isAdmin ? "/dashboard" : MEMBER_PREFIX;
 
   if (pathname === "/offline" || pathname === "/manifest.webmanifest") return NextResponse.next();
   if (isPublic || pathname === "/") {

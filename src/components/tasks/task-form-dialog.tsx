@@ -4,7 +4,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { uploadAttachment } from "@/actions/attachments";
 import { createTask, updateTask } from "@/actions/tasks";
+import { AttachButton, FileDropZone, PendingFiles, mergeFiles } from "@/components/shared/attachment-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -90,6 +92,9 @@ export function TaskFormDialog({
   const router = useRouter();
   const [values, setValues] = useState<TaskFormValues>(task ?? emptyTaskValues(defaults));
   const [errors, setErrors] = useState<Record<string, string[]>>({});
+  // Files picked, dropped or pasted into the dialog; uploaded to the task once it is saved.
+  const [files, setFiles] = useState<File[]>([]);
+  const addFiles = (incoming: File[]) => setFiles((prev) => mergeFiles(prev, incoming, { perFile: true }));
   const [pending, startTransition] = useTransition();
   const isEdit = Boolean(task?.id);
 
@@ -102,6 +107,7 @@ export function TaskFormDialog({
     if (open) {
       setValues(task ?? emptyTaskValues(defaults));
       setErrors({});
+      setFiles([]);
     }
   }
 
@@ -146,7 +152,17 @@ export function TaskFormDialog({
         toast.error(result.error);
         return;
       }
+      // Each file goes in its own request so a task can carry more than 5 MB in total.
+      const failed: string[] = [];
+      for (const file of files) {
+        const fd = new FormData();
+        fd.set("taskId", result.data.id);
+        fd.set("file", file);
+        const upload = await uploadAttachment(fd);
+        if (!upload.ok) failed.push(`${file.name}: ${upload.error}`);
+      }
       toast.success(isEdit ? "Task updated" : "Task created");
+      if (failed.length) toast.error(`Could not attach ${failed.length === 1 ? "a file" : `${failed.length} files`}: ${failed.join("; ")}`);
       onOpenChange(false);
       onSaved?.(result.data.id);
       router.refresh();
@@ -166,7 +182,7 @@ export function TaskFormDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <FileDropZone onFiles={addFiles} disabled={pending} className="grid gap-4 sm:grid-cols-2" overlayClassName="-inset-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="title">Title</Label>
               <Input id="title" value={values.title} onChange={(e) => set("title", e.target.value)} required autoFocus />
@@ -180,7 +196,28 @@ export function TaskFormDialog({
                 onChange={(e) => set("description", e.target.value)}
                 rows={3}
                 placeholder="What needs to be done?"
+                onPaste={(e) => {
+                  const images = Array.from(e.clipboardData.items)
+                    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+                    .map((item) => item.getAsFile())
+                    .filter((f): f is File => Boolean(f));
+                  if (images.length === 0) return;
+                  e.preventDefault();
+                  addFiles(images.map((f, i) => new File([f], `pasted-image-${Date.now()}${i ? `-${i + 1}` : ""}.${f.type.split("/")[1]?.replace("jpeg", "jpg") || "png"}`, { type: f.type })));
+                }}
               />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Attachments</Label>
+              <div className="rounded-lg border border-dashed p-3">
+                <PendingFiles files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, j) => j !== i))} className="mb-2" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <AttachButton onFiles={addFiles} disabled={pending} label="Attach files" title="Attach images or files (5 MB each)" />
+                  <span className="text-xs text-muted-foreground">
+                    {files.length === 0 ? "or drag and drop files anywhere in this form · images can be pasted into the description" : `${files.length} ${files.length === 1 ? "file" : "files"} will be uploaded when the task is ${isEdit ? "saved" : "created"}`}
+                  </span>
+                </div>
+              </div>
             </div>
             {!lockProject && (options.projects.length > 0 || !options.canCreateOutsideProject) && (
               <div className="space-y-1.5">
@@ -323,7 +360,7 @@ export function TaskFormDialog({
                 className="w-full accent-primary"
               />
             </div>
-          </div>
+          </FileDropZone>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>

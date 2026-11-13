@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MentionComposer, mentionedIds, renderWithMentions, type MentionUser } from "@/components/tasks/mention-composer";
 import { AttachmentChip } from "@/components/member/task-conversation";
+import { AttachButton, FileDropZone, PendingFiles, acceptPasted, mergeFiles } from "@/components/shared/attachment-picker";
 import { cn, formatDateTime, getInitials, timeAgo } from "@/lib/utils";
 
 export type CommentNode = {
@@ -49,27 +50,40 @@ export function CommentSection({
 }) {
   const router = useRouter();
   const [content, setContent] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState("");
+  const [replyFiles, setReplyFiles] = useState<File[]>([]);
+  const addFiles = (incoming: File[]) => setFiles((prev) => mergeFiles(prev, incoming));
+  const addReplyFiles = (incoming: File[]) => setReplyFiles((prev) => mergeFiles(prev, incoming));
   const [posting, startPost] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const total = comments.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0);
 
-  function post(text: string, parentId: string | null) {
+  function post(text: string, parentId: string | null, attached: File[]) {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed && attached.length === 0) return;
+    const fd = new FormData();
+    if ("taskId" in target) fd.set("taskId", target.taskId);
+    else fd.set("projectId", target.projectId);
+    if (parentId) fd.set("parentId", parentId);
+    fd.set("content", trimmed);
+    fd.set("mentionIds", JSON.stringify(mentionedIds(trimmed, users)));
+    for (const f of attached) fd.append("file", f);
     startPost(async () => {
-      const result = await addComment({ ...target, parentId: parentId ?? undefined, content: trimmed, mentionIds: mentionedIds(trimmed, users) });
+      const result = await addComment(fd);
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
       if (parentId) {
         setReplyContent("");
+        setReplyFiles([]);
         setReplyTo(null);
       } else {
         setContent("");
+        setFiles([]);
       }
       toast.success(parentId ? "Reply posted" : "Comment posted");
       router.refresh();
@@ -104,7 +118,16 @@ export function CommentSection({
             {mine && <span className="rounded bg-muted px-1 text-[10px]">you</span>}
             <span className="ml-auto flex items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
               {canComment && !isReply && (
-                <Button size="icon-xs" variant="ghost" aria-label="Reply" title="Reply" onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  aria-label="Reply"
+                  title="Reply"
+                  onClick={() => {
+                    setReplyTo(replyTo === c.id ? null : c.id);
+                    setReplyFiles([]);
+                  }}
+                >
                   <CornerDownRight />
                 </Button>
               )}
@@ -123,7 +146,7 @@ export function CommentSection({
             </span>
           </div>
           {c.title && <p className="text-sm font-semibold">{c.title}</p>}
-          <p className="whitespace-pre-wrap text-sm">{renderWithMentions(c.content, mentionUsers, currentUserId)}</p>
+          {c.content && <p className="whitespace-pre-wrap text-sm">{renderWithMentions(c.content, mentionUsers, currentUserId)}</p>}
           {c.attachments?.map((f) => (
             <AttachmentChip key={f.id} file={f} />
           ))}
@@ -132,26 +155,36 @@ export function CommentSection({
             <ul className="mt-2 border-l-2 pl-3">{c.replies!.map((r) => item(r, true))}</ul>
           )}
           {!isReply && replyTo === c.id && (
-            <div className="mt-2 space-y-2 border-l-2 pl-3">
+            <FileDropZone onFiles={addReplyFiles} className="mt-2 space-y-2 border-l-2 pl-3">
               <MentionComposer
                 value={replyContent}
                 onChange={setReplyContent}
                 users={users}
                 rows={2}
                 autoFocus
-                placeholder={`Reply to ${c.author.name}… use @ to mention someone`}
+                placeholder={`Reply to ${c.author.name}… use @ to mention someone · paste or drop files`}
                 ariaLabel="Reply"
-                onSubmit={() => post(replyContent, c.id)}
+                onSubmit={() => post(replyContent, c.id, replyFiles)}
+                onPasteFiles={(fs) => acceptPasted(fs, addReplyFiles)}
               />
+              <PendingFiles files={replyFiles} onRemove={(i) => setReplyFiles((prev) => prev.filter((_, j) => j !== i))} />
               <div className="flex items-center gap-2">
-                <Button size="sm" disabled={posting || !replyContent.trim()} onClick={() => post(replyContent, c.id)}>
+                <Button size="sm" disabled={posting || (!replyContent.trim() && replyFiles.length === 0)} onClick={() => post(replyContent, c.id, replyFiles)}>
                   {posting ? <Loader2 className="animate-spin" /> : <Send />} Reply
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setReplyTo(null)}>
+                <AttachButton onFiles={addReplyFiles} disabled={posting} size="icon-sm" variant="ghost" iconOnly label="Attach files to the reply" />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setReplyTo(null);
+                    setReplyFiles([]);
+                  }}
+                >
                   Cancel
                 </Button>
               </div>
-            </div>
+            </FileDropZone>
           )}
         </div>
       </li>
@@ -176,22 +209,25 @@ export function CommentSection({
           ))}
 
         {canComment && (
-          <div className={cn("space-y-2", layout === "composer-bottom" && "border-t pt-4")}>
+          <FileDropZone onFiles={addFiles} className={cn("space-y-2", layout === "composer-bottom" && "border-t pt-4")}>
             <MentionComposer
               value={content}
               onChange={setContent}
               users={users}
-              placeholder="Write a comment… type @ to mention someone"
+              placeholder="Write a comment… type @ to mention someone · paste or drop files to attach"
               ariaLabel="New comment"
-              onSubmit={() => post(content, null)}
+              onSubmit={() => post(content, null, files)}
+              onPasteFiles={(fs) => acceptPasted(fs, addFiles)}
             />
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Ctrl+Enter to post · @ to mention</span>
-              <Button size="sm" disabled={posting || !content.trim()} onClick={() => post(content, null)}>
+            <PendingFiles files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, j) => j !== i))} />
+            <div className="flex flex-wrap items-center gap-2">
+              <AttachButton onFiles={addFiles} disabled={posting} title="Attach files (images show inline · 5 MB per comment)" />
+              <span className="text-xs text-muted-foreground">Ctrl+Enter to post · @ to mention · drag files here</span>
+              <Button size="sm" className="ml-auto" disabled={posting || (!content.trim() && files.length === 0)} onClick={() => post(content, null, files)}>
                 {posting ? <Loader2 className="animate-spin" /> : <Send />} Post
               </Button>
             </div>
-          </div>
+          </FileDropZone>
         )}
 
         {layout === "composer-top" &&

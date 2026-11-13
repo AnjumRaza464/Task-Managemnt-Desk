@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CornerDownRight, FileText, ImageIcon, Loader2, MessageCircle, MessagesSquare, Paperclip, Send, X } from "lucide-react";
+import { CornerDownRight, FileText, Loader2, MessageCircle, MessagesSquare, Paperclip, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { getTaskMessages, postTaskMessage, type TaskMessage, type TaskMessageAttachment } from "@/actions/task-messages";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { MentionComposer, mentionedIds, renderWithMentions, type MentionUser } from "@/components/tasks/mention-composer";
-import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
+import { FileDropZone, PendingFiles, acceptPasted, mergeFiles, pickFiles } from "@/components/shared/attachment-picker";
 import { cn, formatBytes, formatDateTime, getInitials, timeAgo } from "@/lib/utils";
 import type { CommentKind } from "@/generated/prisma/enums";
 
@@ -64,63 +64,6 @@ function ImageAttachment({ file, href, mine }: { file: TaskMessageAttachment; hr
       </Dialog>
     </>
   );
-}
-
-/** Picked / pasted files waiting above a composer, each removable. */
-function PendingFiles({ files, onRemove }: { files: File[]; onRemove: (index: number) => void }) {
-  if (files.length === 0) return null;
-  return (
-    <div className="mb-2 flex flex-wrap gap-1.5">
-      {files.map((file, i) => (
-        <div key={`${file.name}-${file.size}-${i}`} className="flex max-w-full items-center gap-1.5 rounded-lg border bg-muted/40 px-2 py-1 text-xs">
-          {file.type.startsWith("image/") ? <ImageIcon className="size-3.5 shrink-0" /> : <Paperclip className="size-3.5 shrink-0" />}
-          <span className="truncate">{file.name}</span>
-          <span className="shrink-0 text-muted-foreground">{formatBytes(file.size)}</span>
-          <button type="button" className="ml-1 shrink-0" aria-label={`Remove ${file.name}`} onClick={() => onRemove(i)}>
-            <X className="size-3" />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const MAX_FILES_PER_MESSAGE = 10;
-
-/**
- * Adds picked or pasted files to the pending list. One message may carry up
- * to 10 files and 5 MB in total (the server-action body limit), each under 5 MB.
- */
-function mergeFiles(current: File[], incoming: File[]): File[] {
-  const next = [...current];
-  for (const f of incoming) {
-    if (f.size > MAX_ATTACHMENT_BYTES) {
-      toast.error(`"${f.name}" is larger than 5 MB.`);
-      continue;
-    }
-    if (next.length >= MAX_FILES_PER_MESSAGE) {
-      toast.error(`Up to ${MAX_FILES_PER_MESSAGE} files per message.`);
-      break;
-    }
-    if (next.reduce((n, x) => n + x.size, 0) + f.size > MAX_ATTACHMENT_BYTES) {
-      toast.error("All files of one message together must stay under 5 MB.");
-      break;
-    }
-    next.push(f);
-  }
-  return next;
-}
-
-function pickFiles(e: React.ChangeEvent<HTMLInputElement>, add: (files: File[]) => void) {
-  const list = Array.from(e.target.files ?? []);
-  e.target.value = "";
-  if (list.length) add(list);
-}
-
-/** Images pasted with Ctrl+V become pending attachments, like picked files. */
-function acceptPasted(files: File[], add: (files: File[]) => void) {
-  add(files);
-  toast.success(files.length === 1 ? "Image attached" : `${files.length} images attached`);
 }
 
 /**
@@ -330,8 +273,8 @@ export function TaskConversation({
         {canPost && (
           <div className="mt-3">
             {open ? (
-              <div className="space-y-2 rounded-lg bg-muted/40 p-2">
-                <PendingFiles files={replyFiles} onRemove={(i) => setReplyFiles((prev) => prev.filter((_, j) => j !== i))} />
+              <FileDropZone onFiles={addReplyFiles} className="space-y-2 rounded-lg bg-muted/40 p-2">
+                <PendingFiles className="mb-2" files={replyFiles} onRemove={(i) => setReplyFiles((prev) => prev.filter((_, j) => j !== i))} />
                 <div className="flex items-end gap-2">
                   <input ref={replyFileInput} type="file" multiple className="hidden" onChange={(e) => pickFiles(e, addReplyFiles)} aria-label="Attach files to the reply" />
                   <Button type="button" size="icon-sm" variant="outline" aria-label="Attach files" onClick={() => replyFileInput.current?.click()}>
@@ -345,7 +288,7 @@ export function TaskConversation({
                     <X />
                   </Button>
                 </div>
-              </div>
+              </FileDropZone>
             ) : (
               <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => setReplyTo(m.id)}>
                 <CornerDownRight className="size-3" /> Reply
@@ -376,7 +319,7 @@ export function TaskConversation({
         )}
       </div>
 
-      <div className="border-t bg-background/80 p-3">
+      <FileDropZone onFiles={addFiles} disabled={!canPost} className="border-t bg-background/80 p-3">
         <div className="mb-2 flex items-center gap-2">
           <div className="flex rounded-lg border p-0.5">
             {(["CHAT", "DISCUSSION"] as const).map((k) => (
@@ -399,7 +342,7 @@ export function TaskConversation({
             ))}
           </div>
           <span className="hidden text-[11px] text-muted-foreground sm:inline">
-            {kind === "CHAT" ? "Quick messages with everyone on this task" : "Start a topic; people reply underneath · paste images with Ctrl+V"}
+            {kind === "CHAT" ? "Quick messages with everyone on this task · drop files here" : "Start a topic; people reply underneath · paste images with Ctrl+V or drop files"}
           </span>
         </div>
 
@@ -407,7 +350,7 @@ export function TaskConversation({
           <p className="text-xs text-muted-foreground">You can read this conversation but not post in it.</p>
         ) : kind === "CHAT" ? (
           <>
-            <PendingFiles files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, j) => j !== i))} />
+            <PendingFiles className="mb-2" files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, j) => j !== i))} />
             <div className="flex items-end gap-2">
               <input ref={fileInput} type="file" multiple className="hidden" onChange={(e) => pickFiles(e, addFiles)} aria-label="Attach files" />
               <Button type="button" size="icon" variant="outline" aria-label="Attach files" title="Attach files (max 5 MB per message)" onClick={() => fileInput.current?.click()}>
@@ -418,7 +361,7 @@ export function TaskConversation({
                 {sending ? <Loader2 className="animate-spin" /> : <Send />} Send
               </Button>
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Ctrl+Enter to send · attach several files (5 MB per message); they are saved with the task</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">Ctrl+Enter to send · attach, drop or paste files (5 MB per message); they are saved with the task</p>
           </>
         ) : (
           <div className="space-y-2">
@@ -436,7 +379,7 @@ export function TaskConversation({
             </div>
           </div>
         )}
-      </div>
+      </FileDropZone>
     </div>
   );
 }

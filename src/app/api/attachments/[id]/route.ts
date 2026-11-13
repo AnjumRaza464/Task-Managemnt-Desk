@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-guard";
-import { getTaskAccess } from "@/lib/permissions";
+import { getProjectAccess, getTaskAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(_req: Request, { params }: RouteContext<"/api/attachments/[id]">) {
@@ -10,14 +10,25 @@ export async function GET(_req: Request, { params }: RouteContext<"/api/attachme
   const { id } = await params;
   const attachment = await prisma.attachment.findUnique({
     where: { id },
-    select: { fileName: true, mimeType: true, size: true, data: true, task: { select: { id: true, projectId: true, assignees: { select: { userId: true } } } } },
+    select: {
+      fileName: true,
+      mimeType: true,
+      size: true,
+      data: true,
+      projectId: true,
+      task: { select: { id: true, projectId: true, assignees: { select: { userId: true } } } },
+    },
   });
   if (!attachment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Members may only download attachments from tasks they can see (assigned or in their projects).
-  if (!(await getTaskAccess(user, attachment.task)).canView) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Members may only open files from tasks they can see (assigned or in their projects)
+  // and from project discussions of their projects.
+  const canView = attachment.task
+    ? (await getTaskAccess(user, attachment.task)).canView
+    : attachment.projectId
+      ? Boolean((await getProjectAccess(user, attachment.projectId))?.canView)
+      : user.role !== "MEMBER";
+  if (!canView) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const safeName = encodeURIComponent(attachment.fileName).replace(/['()]/g, escape);
   return new NextResponse(new Uint8Array(attachment.data), {

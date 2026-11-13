@@ -106,9 +106,14 @@ function loadProject(id: string) {
         include: {
           author: { select: { id: true, name: true } },
           mentions: { select: { userId: true } },
+          attachments: { select: { id: true, fileName: true, mimeType: true, size: true }, orderBy: { createdAt: "asc" } },
           replies: {
             orderBy: { createdAt: "asc" },
-            include: { author: { select: { id: true, name: true } }, mentions: { select: { userId: true } } },
+            include: {
+              author: { select: { id: true, name: true } },
+              mentions: { select: { userId: true } },
+              attachments: { select: { id: true, fileName: true, mimeType: true, size: true }, orderBy: { createdAt: "asc" } },
+            },
           },
         },
       },

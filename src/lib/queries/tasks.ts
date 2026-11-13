@@ -88,6 +88,7 @@ const STATUS_RANK: Record<TaskStatus, number> = { PENDING: 0, IN_PROGRESS: 1, OV
 export const taskListInclude = {
   assignee: { select: { id: true, name: true, email: true } },
   assignees: assigneeSelect,
+  createdBy: { select: { id: true, name: true } },
   category: { select: { id: true, name: true, color: true } },
   plan: { select: { id: true, year: true, month: true } },
   project: { select: { id: true, name: true, color: true } },

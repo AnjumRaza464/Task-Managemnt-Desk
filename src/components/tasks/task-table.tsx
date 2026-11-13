@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AssigneeAvatars } from "@/components/shared/assignee-avatars";
+import { CreatedBy } from "@/components/shared/created-by";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -162,6 +163,7 @@ export function TaskTable({
             <TableRow>
               <Head label="Task" sortKey="title" sortable={sortable} />
               {showAssignee && <Head label="Assignees" sortKey="assignee" className="hidden md:table-cell" sortable={sortable} />}
+              <TableHead className="hidden lg:table-cell">Created by</TableHead>
               <TableHead className="hidden xl:table-cell">Category</TableHead>
               <Head label="Priority" sortKey="priority" className="hidden sm:table-cell" sortable={sortable} />
               <Head label="Status" sortKey="status" sortable={sortable} />
@@ -222,6 +224,9 @@ export function TaskTable({
                       <AssigneeAvatars assignees={task.assignees} size="md" showNames />
                     </TableCell>
                   )}
+                  <TableCell className="hidden lg:table-cell">
+                    <CreatedBy user={task.createdBy} />
+                  </TableCell>
                   <TableCell className="hidden xl:table-cell">
                     <CategoryBadge category={task.category} />
                   </TableCell>

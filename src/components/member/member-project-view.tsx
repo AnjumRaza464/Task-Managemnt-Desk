@@ -16,6 +16,7 @@ import type { LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AssigneeAvatars } from "@/components/shared/assignee-avatars";
+import { CreatedBy } from "@/components/shared/created-by";
 import { PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { EmptyState } from "@/components/shared/empty-state";
 import { SelectField } from "@/components/shared/select-field";
@@ -294,6 +295,7 @@ export function MemberProjectView({
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden sm:table-cell">Priority</TableHead>
                   <TableHead className="hidden md:table-cell">Assignee</TableHead>
+                  <TableHead className="hidden lg:table-cell">Created by</TableHead>
                   <TableHead className="hidden lg:table-cell">List</TableHead>
                   <TableHead>Due</TableHead>
                 </TableRow>
@@ -317,6 +319,9 @@ export function MemberProjectView({
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       <AssigneeAvatars assignees={t.assignees} size="sm" showNames />
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <CreatedBy user={t.createdBy} />
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">{t.list?.name ?? "Unsorted"}</TableCell>
                     <TableCell className={cn("whitespace-nowrap text-sm", t.status === "OVERDUE" ? "font-medium text-rose-600 dark:text-rose-400" : "text-muted-foreground")}>

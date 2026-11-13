@@ -13,7 +13,10 @@ export const TASK_STATUSES: TaskStatus[] = [
 
 export const PRIORITIES: Priority[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
-export const ROLES: Role[] = ["ADMIN", "MANAGER", "MEMBER"];
+export const ROLES: Role[] = ["ADMIN", "CEO", "MANAGER", "MEMBER"];
+
+/** Roles that see every workspace, project and task (the CEO in the workspace UI, the admin in the admin panel). */
+export const isGlobalRole = (role: Role | string | undefined | null): boolean => role === "ADMIN" || role === "CEO";
 
 export const STATUS_LABELS: Record<TaskStatus, string> = {
   PENDING: "Pending",
@@ -32,6 +35,7 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Admin",
+  CEO: "CEO",
   MANAGER: "Manager",
   MEMBER: "Team Member",
 };

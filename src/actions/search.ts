@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-guard";
-import { MONTH_NAMES, ROLE_LABELS, STATUS_LABELS } from "@/lib/constants";
+import { MONTH_NAMES, ROLE_LABELS, STATUS_LABELS, isGlobalRole } from "@/lib/constants";
 import type { Prisma } from "@/generated/prisma/client";
 
 export type SearchHit = { id: string; label: string; detail?: string; href: string };
@@ -32,7 +32,7 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
 
   const contains = { contains: q, mode: "insensitive" as const };
 
-  if (user.role !== "ADMIN") {
+  if (!isGlobalRole(user.role)) {
     // Members: the tasks assigned to them. Managers: those plus the tasks they created.
     const mine: Prisma.TaskWhereInput =
       user.role === "MANAGER"

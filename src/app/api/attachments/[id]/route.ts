@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-guard";
+import { isGlobalRole } from "@/lib/constants";
 import { getProjectAccess, getTaskAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
@@ -27,7 +28,7 @@ export async function GET(_req: Request, { params }: RouteContext<"/api/attachme
     ? (await getTaskAccess(user, attachment.task)).canView
     : attachment.projectId
       ? Boolean((await getProjectAccess(user, attachment.projectId))?.canView)
-      : user.role === "ADMIN";
+      : isGlobalRole(user.role);
   if (!canView) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const safeName = encodeURIComponent(attachment.fileName).replace(/['()]/g, escape);

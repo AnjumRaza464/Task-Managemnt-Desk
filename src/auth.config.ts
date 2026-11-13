@@ -26,7 +26,7 @@ export const authConfig = {
     session({ session, token }) {
       if (token) {
         session.user.id = token.id as string;
-        session.user.role = token.role as "ADMIN" | "MANAGER" | "MEMBER";
+        session.user.role = token.role as "ADMIN" | "CEO" | "MANAGER" | "MEMBER";
         session.user.loginId = token.loginId as string | undefined;
       }
       return session;

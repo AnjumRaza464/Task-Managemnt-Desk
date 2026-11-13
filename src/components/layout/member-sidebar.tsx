@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, FolderKanban, FolderOpen, FolderPlus, ListTodo, Plus } from "lucide-react";
+import { Building2, FolderKanban, FolderOpen, FolderPlus, LayoutDashboard, ListTodo, Plus } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -83,6 +83,14 @@ export function MemberSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              {user.role === "CEO" && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={isActive("/dashboard")} tooltip="Dashboard" render={<Link href="/dashboard" prefetch />}>
+                    <NavLinkIcon icon={LayoutDashboard} />
+                    <span>Dashboard</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               <SidebarMenuItem>
                 <SidebarMenuButton isActive={isActive("/my-tasks")} tooltip="My tasks" render={<Link href="/my-tasks" prefetch />}>
                   <NavLinkIcon icon={ListTodo} />

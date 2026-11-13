@@ -9,6 +9,8 @@ const MEMBER_PREFIX = "/my-tasks";
 const MEMBER_PREFIXES = ["/my-tasks", "/my-files", "/my-projects", "/my-notifications"];
 /** Admin-panel pages a manager may still open from the workspace area. */
 const MANAGER_EXTRA = ["/settings"];
+/** The CEO also gets the company-wide dashboard, inside the workspace UI. */
+const CEO_EXTRA = ["/settings", "/dashboard"];
 const isMemberPath = (pathname: string) => MEMBER_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
 /** Manager URLs that have a member-area twin, so shared links still land somewhere useful. */
@@ -39,12 +41,12 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Admins get the full admin panel; managers and members use the workspace area.
+  // Admins get the full admin panel; the CEO, managers and members use the workspace area.
   const role = user?.role;
   const isAdmin = role === "ADMIN";
-  const isManager = role === "MANAGER";
   const isMember = !isAdmin;
-  // The same page the sign-in lands on: admins get the dashboard, managers and members their tasks.
+  const extra = role === "CEO" ? CEO_EXTRA : role === "MANAGER" ? MANAGER_EXTRA : [];
+  // The same page the sign-in lands on: admins get the dashboard, everyone else their tasks.
   const home = isAdmin ? "/dashboard" : MEMBER_PREFIX;
 
   if (pathname === "/offline" || pathname === "/manifest.webmanifest") return NextResponse.next();
@@ -52,7 +54,7 @@ export default auth((req) => {
     return NextResponse.redirect(new URL(home, nextUrl));
   }
 
-  const managerAllowed = isManager && MANAGER_EXTRA.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  const managerAllowed = extra.some((p) => pathname === p || pathname.startsWith(p + "/"));
   // Members and managers stay in the workspace area (API routes check access themselves).
   if (isMember && !isMemberPath(pathname) && !isApi && !managerAllowed) {
     return NextResponse.redirect(new URL(memberEquivalent(pathname), nextUrl));

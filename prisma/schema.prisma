@@ -9,6 +9,8 @@ datasource db {
 
 enum Role {
   ADMIN
+  /// Sees everything an admin sees, inside the workspace (manager-style) UI.
+  CEO
   MANAGER
   MEMBER
 }

@@ -28,6 +28,7 @@ export function PriorityBadge({ priority, className }: { priority: Priority; cla
 export function RoleBadge({ role }: { role: Role }) {
   const styles: Record<Role, string> = {
     ADMIN: "bg-primary/10 text-primary border-primary/20",
+    CEO: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30",
     MANAGER: "bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30",
     MEMBER: "bg-muted text-muted-foreground",
   };

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { UnauthorizedError } from "@/lib/auth-guard";
 import { ActionError, runAction } from "@/lib/action-result";
 import { logActivity, notifyManagers, notifyUsers } from "@/lib/activity";
-import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
+import { MAX_ATTACHMENT_BYTES, isGlobalRole } from "@/lib/constants";
 import { getProjectAccess, requireProjectAccess, requireTaskAccess, requireUser } from "@/lib/permissions";
 import { commentSchema } from "@/lib/validations/task";
 
@@ -232,7 +232,7 @@ export async function deleteComment(id: string) {
     });
     if (!comment) throw new ActionError("Comment not found.");
 
-    let allowed = comment.authorId === user.id || user.role === "ADMIN";
+    let allowed = comment.authorId === user.id || isGlobalRole(user.role);
     if (!allowed) {
       const projectId = comment.projectId ?? comment.task?.projectId ?? null;
       const access = projectId ? await getProjectAccess(user, projectId) : null;

@@ -10,8 +10,8 @@ import { InstallBanner } from "@/components/pwa/install-banner";
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const manager = await requireManagerPage();
 
-  // Managers only reach a few admin-panel pages (Settings); they keep their workspace sidebar there.
-  if (manager.role === "MANAGER") return <WorkspaceShell user={manager}>{children}</WorkspaceShell>;
+  // Managers (Settings) and the CEO (Settings, Dashboard) reach a few admin-panel pages; they keep their workspace sidebar there.
+  if (manager.role !== "ADMIN") return <WorkspaceShell user={manager}>{children}</WorkspaceShell>;
 
   const unreadCount = await getUnreadNotificationCount(manager.id);
   return (

@@ -18,7 +18,7 @@ export default async function MyProjectsPage() {
   // Overdue sync runs after the response is sent so it never delays the page.
   after(() => syncOverdueTasks());
 
-  if (user.role === "MANAGER") {
+  if (user.role !== "MEMBER") {
     const [workspaces, users, workspaceOptions] = await Promise.all([getWorkspacesOverview(user), getAssignableUsers(), getWorkspaceOptions()]);
     const projectCount = workspaces.reduce((n, w) => n + w.projects.length, 0);
     return (

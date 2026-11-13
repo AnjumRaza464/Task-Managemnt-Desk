@@ -11,7 +11,7 @@ const optionalText = (max: number) =>
 export const userSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(80),
   email: z.email("Enter a valid email").trim().toLowerCase(),
-  role: z.enum(["ADMIN", "MANAGER", "MEMBER"]),
+  role: z.enum(["ADMIN", "CEO", "MANAGER", "MEMBER"]),
   designation: optionalText(80),
   department: optionalText(80),
   phone: optionalText(30),

@@ -12,6 +12,7 @@ import { ActivityTracker } from "@/components/attendance/activity-tracker";
 import { InstallAppButton } from "@/components/pwa/install-app";
 
 const TITLES: Array<[string, string]> = [
+  ["/dashboard", "Dashboard"],
   ["/my-tasks", "Dashboard"],
   ["/my-projects", "Projects"],
   ["/my-files", "Files"],

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-guard";
+import { isGlobalRole } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 
 const INLINE_TYPES = /^(image\/|application\/pdf$|text\/plain$)/;
@@ -29,8 +30,8 @@ export async function GET(req: Request, { params }: RouteContext<"/api/files/[id
   if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const isRecipient = file.recipients.length > 0;
-  // Admins open any file; everyone else only what is public, shared with them, or shared by them.
-  const isManager = user.role === "ADMIN" || file.sharedById === user.id;
+  // Admins and the CEO open any file; everyone else only what is public, shared with them, or shared by them.
+  const isManager = isGlobalRole(user.role) || file.sharedById === user.id;
   if (!file.isPublic && !isRecipient && !isManager) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

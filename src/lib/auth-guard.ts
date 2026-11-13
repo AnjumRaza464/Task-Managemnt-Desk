@@ -12,7 +12,7 @@ export type CurrentUser = {
   role: Role;
 };
 
-export type CurrentManager = CurrentUser & { role: "ADMIN" | "MANAGER" };
+export type CurrentManager = CurrentUser & { role: "ADMIN" | "CEO" | "MANAGER" };
 
 export class UnauthorizedError extends Error {
   constructor(message = "You are not authorized to perform this action.") {

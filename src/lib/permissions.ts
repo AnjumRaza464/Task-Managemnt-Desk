@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, UnauthorizedError, type CurrentUser } from "@/lib/auth-guard";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ProjectRole } from "@/generated/prisma/enums";
+import { isGlobalRole } from "@/lib/constants";
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
 /**
  * What the signed-in user may do inside one project.
  *
- * - ADMIN: everything, in every project.
+ * - ADMIN / CEO: everything, in every project.
  * - MANAGER: only the projects they belong to (created, assigned a task in,
  *   or assigned to), with full project powers there.
  * - Project OWNER / MANAGER: manage the project (lists, milestones, members,
@@ -32,7 +33,7 @@ export type ProjectAccess = {
 export const PROJECT_ROLE_RANK: Record<ProjectRole, number> = { VIEWER: 0, MEMBER: 1, MANAGER: 2, OWNER: 3 };
 
 export function accessFromRole(projectId: string, user: CurrentUser, role: ProjectRole | null): ProjectAccess | null {
-  const isGlobalManager = user.role === "ADMIN";
+  const isGlobalManager = isGlobalRole(user.role);
   if (isGlobalManager) {
     return { projectId, role, isGlobalManager, canView: true, canComment: true, canEdit: true, canManage: true };
   }
@@ -51,7 +52,7 @@ export function accessFromRole(projectId: string, user: CurrentUser, role: Proje
 }
 
 export async function getProjectAccess(user: CurrentUser, projectId: string, db: Db = prisma): Promise<ProjectAccess | null> {
-  if (user.role === "ADMIN") {
+  if (isGlobalRole(user.role)) {
     const exists = await db.project.findUnique({ where: { id: projectId }, select: { id: true } });
     return exists ? accessFromRole(projectId, user, null) : null;
   }
@@ -116,7 +117,7 @@ export function ownTasksWhere(user: CurrentUser): Prisma.TaskWhereInput | undefi
 
 export async function getTaskAccess(user: CurrentUser, task: TaskForAccess, db: Db = prisma): Promise<TaskAccess> {
   const isAssignee = task.assignees.some((a) => a.userId === user.id);
-  if (user.role === "ADMIN") {
+  if (isGlobalRole(user.role)) {
     return { canView: true, canUpdateProgress: true, canEdit: true, canManage: true, canComment: true, isAssignee };
   }
   // A manager only sees the tasks they created or are assigned to, and keeps full control of those.
@@ -155,9 +156,9 @@ export async function requireTaskAccess(taskId: string, level: keyof Omit<TaskAc
   return { user, access, task };
 }
 
-/** Ids of the projects the user belongs to (every project for admins → null). */
+/** Ids of the projects the user belongs to (every project for admins and the CEO → null). */
 export async function visibleProjectIds(user: CurrentUser, db: Db = prisma): Promise<string[] | null> {
-  if (user.role === "ADMIN") return null;
+  if (isGlobalRole(user.role)) return null;
   const rows = await db.projectMember.findMany({ where: { userId: user.id }, select: { projectId: true } });
   return rows.map((r) => r.projectId);
 }

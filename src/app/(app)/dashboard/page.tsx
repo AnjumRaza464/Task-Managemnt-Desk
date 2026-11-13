@@ -33,6 +33,9 @@ export default async function DashboardPage() {
   after(() => syncOverdueTasks());
   const data = await getDashboardData();
   const { stats } = data;
+  // The CEO gets a read-only overview: no buttons, no links, nothing to click.
+  const readOnly = manager.role === "CEO";
+  const link = (href: string) => (readOnly ? undefined : href);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -43,39 +46,43 @@ export default async function DashboardPage() {
         title={`${greeting}, ${manager.name.split(" ")[0]}`}
         description={`${formatDate(new Date(), "EEEE, MMMM d, yyyy")} · here is how the team is doing`}
       >
-        <Button variant="outline" nativeButton={false} render={<Link href="/monthly-plans" />}>
-          <CalendarDays /> Monthly plans
-        </Button>
-        <Button nativeButton={false} render={<Link href="/tasks" />}>
-          <ListTodo /> All tasks
-        </Button>
+        {!readOnly && (
+          <>
+            <Button variant="outline" nativeButton={false} render={<Link href="/monthly-plans" />}>
+              <CalendarDays /> Monthly plans
+            </Button>
+            <Button nativeButton={false} render={<Link href="/tasks" />}>
+              <ListTodo /> All tasks
+            </Button>
+          </>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="Active users" value={stats.activeUsers} hint={`${stats.totalUsers} total`} icon={Users} href="/users" />
-        <StatCard label="Total tasks" value={stats.totalTasks} hint={`${stats.avgCompletion}% avg. progress`} icon={ListTodo} href="/tasks" />
+        <StatCard label="Active users" value={stats.activeUsers} hint={`${stats.totalUsers} total`} icon={Users} href={link("/users")} />
+        <StatCard label="Total tasks" value={stats.totalTasks} hint={`${stats.avgCompletion}% avg. progress`} icon={ListTodo} href={link("/tasks")} />
         <StatCard
           label="Completed"
           value={stats.completed}
           hint={`${stats.completionRate}% completion rate`}
           icon={CheckCircle2}
           tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-          href="/tasks?status=COMPLETED"
+          href={link("/tasks?status=COMPLETED")}
         />
         <StatCard
           label="In progress"
           value={stats.inProgress}
           icon={Loader}
           tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
-          href="/tasks?status=IN_PROGRESS"
+          href={link("/tasks?status=IN_PROGRESS")}
         />
-        <StatCard label="Pending" value={stats.pending} icon={Clock} href="/tasks?status=PENDING" />
+        <StatCard label="Pending" value={stats.pending} icon={Clock} href={link("/tasks?status=PENDING")} />
         <StatCard
           label="Overdue"
           value={stats.overdue}
           icon={AlertTriangle}
           tone="bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
-          href="/tasks?status=OVERDUE"
+          href={link("/tasks?status=OVERDUE")}
         />
         <StatCard label="Due today" value={stats.dueToday} icon={CalendarClock} tone="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" />
         <StatCard label="Due this week" value={stats.dueThisWeek} icon={CalendarDays} />
@@ -142,9 +149,13 @@ export default async function DashboardPage() {
                   <li key={task.id} className="flex items-center gap-3 py-2.5">
                     <AssigneeAvatars assignees={task.assignees} size="sm" max={2} />
                     <div className="min-w-0 flex-1">
-                      <Link href={`/tasks/${task.id}`} className="block truncate text-sm font-medium hover:underline">
-                        {task.title}
-                      </Link>
+                      {readOnly ? (
+                        <p className="truncate text-sm font-medium">{task.title}</p>
+                      ) : (
+                        <Link href={`/tasks/${task.id}`} className="block truncate text-sm font-medium hover:underline">
+                          {task.title}
+                        </Link>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         {assigneeLabel(task.assignees)} ·{" "}
                         <span className={cn(task.status === "OVERDUE" && "font-medium text-rose-600 dark:text-rose-400")}>
@@ -182,9 +193,13 @@ export default async function DashboardPage() {
                         {a.task && (
                           <>
                             {" on "}
-                            <Link href={`/tasks/${a.task.id}`} className="font-medium hover:underline">
-                              {a.task.title}
-                            </Link>
+                            {readOnly ? (
+                              <span className="font-medium">{a.task.title}</span>
+                            ) : (
+                              <Link href={`/tasks/${a.task.id}`} className="font-medium hover:underline">
+                                {a.task.title}
+                              </Link>
+                            )}
                           </>
                         )}
                       </p>

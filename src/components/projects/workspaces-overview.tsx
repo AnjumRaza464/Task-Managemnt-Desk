@@ -27,18 +27,21 @@ export function WorkspacesOverview({
   canManage,
   isAdmin,
   projectHref,
+  workspaceOptions,
 }: {
   workspaces: WorkspaceOverview[];
   users: UserOption[];
   canManage: boolean;
   isAdmin: boolean;
   projectHref: string;
+  /** Workspaces offered in the New project dialog; defaults to the ones shown. */
+  workspaceOptions?: { id: string; name: string; color: string }[];
 }) {
   const router = useRouter();
   const [wsDialog, setWsDialog] = useState<{ open: boolean; workspace: WorkspaceFormValues | null }>({ open: false, workspace: null });
   const [projectDialog, setProjectDialog] = useState<{ open: boolean; defaults: Partial<ProjectFormValues> }>({ open: false, defaults: {} });
   const [deleting, setDeleting] = useState<WorkspaceOverview | null>(null);
-  const wsOptions = workspaces.map((w) => ({ id: w.id, name: w.name, color: w.color }));
+  const wsOptions = workspaceOptions ?? workspaces.map((w) => ({ id: w.id, name: w.name, color: w.color }));
 
   return (
     <>
@@ -47,7 +50,7 @@ export function WorkspacesOverview({
           <Button onClick={() => setWsDialog({ open: true, workspace: null })} variant="outline">
             <FolderPlus /> New workspace
           </Button>
-          <Button onClick={() => setProjectDialog({ open: true, defaults: { workspaceId: workspaces[0]?.id ?? "" } })} disabled={workspaces.length === 0}>
+          <Button onClick={() => setProjectDialog({ open: true, defaults: { workspaceId: workspaces[0]?.id ?? wsOptions[0]?.id ?? "" } })} disabled={wsOptions.length === 0}>
             <Plus /> New project
           </Button>
         </div>

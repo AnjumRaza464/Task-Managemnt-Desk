@@ -170,7 +170,7 @@ export function MemberProjectView({
                   options={options}
                   canEdit={false}
                   canManage
-                  canDelete={access.isGlobalManager}
+                  canDelete={access.isGlobalManager || access.role === "OWNER"}
                   backHref="/my-projects"
                 />
                 <Button onClick={() => setCreatingIn(project.lists[0]?.id ?? null)}>

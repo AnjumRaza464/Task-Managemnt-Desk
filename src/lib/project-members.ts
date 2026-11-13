@@ -14,6 +14,15 @@ export function revalidateProjectViews(projectId?: string) {
 }
 
 /**
+ * A manager who assigns work in a project becomes part of it, so the project
+ * shows up for them (managers only see the projects they belong to).
+ */
+export async function ensureManagerInProject(tx: Tx, project: { id: string; name: string }, actor: { id: string; role: string }) {
+  if (actor.role !== "MANAGER") return;
+  await ensureProjectMembers(tx, project, [actor.id], actor.id, "MANAGER");
+}
+
+/**
  * Adds users to a project (no-op for existing members) and tells them.
  * Used when creating a project and whenever someone is assigned a task in it.
  */
@@ -22,7 +31,7 @@ export async function ensureProjectMembers(
   project: { id: string; name: string },
   userIds: string[],
   actorId: string,
-  role: "MEMBER" | "VIEWER" = "MEMBER",
+  role: "MEMBER" | "VIEWER" | "MANAGER" = "MEMBER",
 ) {
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return [];

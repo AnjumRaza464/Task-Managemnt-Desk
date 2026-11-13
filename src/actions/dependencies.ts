@@ -32,7 +32,7 @@ export async function addDependency(input: unknown) {
     const { user } = await requireTaskAccess(taskId, "canEdit");
     const blocker = await prisma.task.findUnique({
       where: { id: blockerId },
-      select: { id: true, title: true, projectId: true, assignees: { select: { userId: true } } },
+      select: { id: true, title: true, projectId: true, createdById: true, assignees: { select: { userId: true } } },
     });
     if (!blocker) throw new ActionError("The other task no longer exists.");
     const blockerAccess = await getTaskAccess(user, blocker);

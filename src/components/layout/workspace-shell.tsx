@@ -1,7 +1,7 @@
 import type { CurrentUser } from "@/lib/auth-guard";
 import { getUnseenFileCount } from "@/lib/queries/files";
 import { getUnreadNotificationCount } from "@/lib/queries/notifications";
-import { getMyProjects, getWorkspacesOverview } from "@/lib/queries/projects";
+import { getMyProjects, getWorkspaceOptions, getWorkspacesOverview } from "@/lib/queries/projects";
 import { getAssignableUsers } from "@/lib/queries/users";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { MemberHeader } from "@/components/layout/member-header";
@@ -16,19 +16,20 @@ import { InstallBanner } from "@/components/pwa/install-banner";
  */
 export async function WorkspaceShell({ user, children }: { user: CurrentUser; children: React.ReactNode }) {
   const isManager = user.role !== "MEMBER";
-  const [unreadNotifications, unseenFiles, projects, all, users] = await Promise.all([
+  const [unreadNotifications, unseenFiles, projects, all, users, workspaceOptions] = await Promise.all([
     getUnreadNotificationCount(user.id),
     getUnseenFileCount(user.id),
     isManager ? Promise.resolve([]) : getMyProjects(user.id),
     isManager ? getWorkspacesOverview(user) : Promise.resolve([]),
-    // Managers can create projects from the sidebar, so they need the people picker.
+    // Managers can create projects from the sidebar, so they need the people picker and every workspace.
     isManager ? getAssignableUsers() : Promise.resolve([]),
+    isManager ? getWorkspaceOptions() : Promise.resolve([]),
   ]);
 
   const workspaces: SidebarWorkspace[] = [];
   const names: Record<string, string> = {};
   if (isManager) {
-    // Managers see every workspace, even empty ones, so they can add projects.
+    // Managers see the workspaces of their projects (and the ones they created), so they can add projects.
     for (const w of all) {
       workspaces.push({
         id: w.id,
@@ -54,7 +55,7 @@ export async function WorkspaceShell({ user, children }: { user: CurrentUser; ch
 
   return (
     <SidebarProvider>
-      <MemberSidebar user={user} workspaces={workspaces} canManage={isManager} users={users} unseenFiles={unseenFiles} />
+      <MemberSidebar user={user} workspaces={workspaces} canManage={isManager} users={users} unseenFiles={unseenFiles} workspaceOptions={workspaceOptions} />
       <SidebarInset>
         <MemberHeader unreadCount={unreadNotifications} projectNames={names} />
         <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">

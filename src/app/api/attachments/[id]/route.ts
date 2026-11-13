@@ -16,7 +16,7 @@ export async function GET(_req: Request, { params }: RouteContext<"/api/attachme
       size: true,
       data: true,
       projectId: true,
-      task: { select: { id: true, projectId: true, assignees: { select: { userId: true } } } },
+      task: { select: { id: true, projectId: true, createdById: true, assignees: { select: { userId: true } } } },
     },
   });
   if (!attachment) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -27,7 +27,7 @@ export async function GET(_req: Request, { params }: RouteContext<"/api/attachme
     ? (await getTaskAccess(user, attachment.task)).canView
     : attachment.projectId
       ? Boolean((await getProjectAccess(user, attachment.projectId))?.canView)
-      : user.role !== "MEMBER";
+      : user.role === "ADMIN";
   if (!canView) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const safeName = encodeURIComponent(attachment.fileName).replace(/['()]/g, escape);

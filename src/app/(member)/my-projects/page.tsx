@@ -3,7 +3,7 @@ import { FolderKanban } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
-import { getMyProjects, getWorkspacesOverview } from "@/lib/queries/projects";
+import { getMyProjects, getWorkspaceOptions, getWorkspacesOverview } from "@/lib/queries/projects";
 import { getAssignableUsers } from "@/lib/queries/users";
 import { WorkspacesOverview } from "@/components/projects/workspaces-overview";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -19,7 +19,7 @@ export default async function MyProjectsPage() {
   after(() => syncOverdueTasks());
 
   if (user.role === "MANAGER") {
-    const [workspaces, users] = await Promise.all([getWorkspacesOverview(user), getAssignableUsers()]);
+    const [workspaces, users, workspaceOptions] = await Promise.all([getWorkspacesOverview(user), getAssignableUsers(), getWorkspaceOptions()]);
     const projectCount = workspaces.reduce((n, w) => n + w.projects.length, 0);
     return (
       <>
@@ -27,7 +27,7 @@ export default async function MyProjectsPage() {
           title="Projects"
           description={`${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"} · ${projectCount} project${projectCount === 1 ? "" : "s"}`}
         />
-        <WorkspacesOverview workspaces={workspaces} users={users} canManage isAdmin={false} projectHref="/my-projects" />
+        <WorkspacesOverview workspaces={workspaces} users={users} canManage isAdmin={false} projectHref="/my-projects" workspaceOptions={workspaceOptions} />
       </>
     );
   }

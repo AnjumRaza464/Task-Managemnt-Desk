@@ -29,7 +29,8 @@ export async function GET(req: Request, { params }: RouteContext<"/api/files/[id
   if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const isRecipient = file.recipients.length > 0;
-  const isManager = user.role !== "MEMBER";
+  // Admins open any file; everyone else only what is public, shared with them, or shared by them.
+  const isManager = user.role === "ADMIN" || file.sharedById === user.id;
   if (!file.isPublic && !isRecipient && !isManager) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

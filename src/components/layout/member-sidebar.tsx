@@ -48,6 +48,7 @@ export function MemberSidebar({
   canManage = false,
   users = [],
   unseenFiles = 0,
+  workspaceOptions,
 }: {
   user: CurrentUser;
   workspaces: SidebarWorkspace[];
@@ -56,6 +57,8 @@ export function MemberSidebar({
   users?: UserOption[];
   /** Files shared with the user that they have not opened yet (badge on Files). */
   unseenFiles?: number;
+  /** Workspaces offered in the New project dialog (all of them, not only the ones shown). */
+  workspaceOptions?: { id: string; name: string; color: string }[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -63,7 +66,7 @@ export function MemberSidebar({
 
   const [wsDialogOpen, setWsDialogOpen] = useState(false);
   const [projectDialog, setProjectDialog] = useState<{ open: boolean; defaults: Partial<ProjectFormValues> }>({ open: false, defaults: {} });
-  const wsOptions = workspaces.map((w) => ({ id: w.id, name: w.name, color: w.color }));
+  const wsOptions = workspaceOptions ?? workspaces.map((w) => ({ id: w.id, name: w.name, color: w.color }));
 
   return (
     <Sidebar collapsible="icon">

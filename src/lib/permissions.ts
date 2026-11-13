@@ -9,7 +9,9 @@ type Db = Prisma.TransactionClient | typeof prisma;
 /**
  * What the signed-in user may do inside one project.
  *
- * - Global ADMIN / MANAGER: everything, in every project.
+ * - ADMIN: everything, in every project.
+ * - MANAGER: only the projects they belong to (created, assigned a task in,
+ *   or assigned to), with full project powers there.
  * - Project OWNER / MANAGER: manage the project (lists, milestones, members,
  *   every task, settings).
  * - Project MEMBER: create tasks, move tasks between lists, update tasks
@@ -19,6 +21,7 @@ type Db = Prisma.TransactionClient | typeof prisma;
 export type ProjectAccess = {
   projectId: string;
   role: ProjectRole | null;
+  /** Admin: sees and manages every project (and may delete them). */
   isGlobalManager: boolean;
   canView: boolean;
   canComment: boolean;
@@ -29,12 +32,13 @@ export type ProjectAccess = {
 export const PROJECT_ROLE_RANK: Record<ProjectRole, number> = { VIEWER: 0, MEMBER: 1, MANAGER: 2, OWNER: 3 };
 
 export function accessFromRole(projectId: string, user: CurrentUser, role: ProjectRole | null): ProjectAccess | null {
-  const isGlobalManager = user.role !== "MEMBER";
+  const isGlobalManager = user.role === "ADMIN";
   if (isGlobalManager) {
     return { projectId, role, isGlobalManager, canView: true, canComment: true, canEdit: true, canManage: true };
   }
   if (!role) return null;
-  const rank = PROJECT_ROLE_RANK[role];
+  // A manager runs every project they are part of, whatever row they were added with.
+  const rank = user.role === "MANAGER" ? Math.max(PROJECT_ROLE_RANK[role], PROJECT_ROLE_RANK.MANAGER) : PROJECT_ROLE_RANK[role];
   return {
     projectId,
     role,
@@ -47,7 +51,7 @@ export function accessFromRole(projectId: string, user: CurrentUser, role: Proje
 }
 
 export async function getProjectAccess(user: CurrentUser, projectId: string, db: Db = prisma): Promise<ProjectAccess | null> {
-  if (user.role !== "MEMBER") {
+  if (user.role === "ADMIN") {
     const exists = await db.project.findUnique({ where: { id: projectId }, select: { id: true } });
     return exists ? accessFromRole(projectId, user, null) : null;
   }
@@ -96,20 +100,22 @@ export type TaskAccess = {
   isAssignee: boolean;
 };
 
-type TaskForAccess = { id: string; projectId: string | null; assignees: { userId: string }[] };
+export type TaskForAccess = { id: string; projectId: string | null; createdById: string; assignees: { userId: string }[] };
 
 export async function getTaskAccess(user: CurrentUser, task: TaskForAccess, db: Db = prisma): Promise<TaskAccess> {
   const isAssignee = task.assignees.some((a) => a.userId === user.id);
-  if (user.role !== "MEMBER") {
+  if (user.role === "ADMIN") {
     return { canView: true, canUpdateProgress: true, canEdit: true, canManage: true, canComment: true, isAssignee };
   }
+  // A manager keeps full control of the tasks they created (also the ones outside any project).
+  const isOwner = user.role === "MANAGER" && task.createdById === user.id;
   const project = task.projectId ? await getProjectAccess(user, task.projectId, db) : null;
-  const canView = isAssignee || Boolean(project?.canView);
+  const canView = isAssignee || isOwner || Boolean(project?.canView);
   return {
     canView,
-    canUpdateProgress: isAssignee || Boolean(project?.canManage),
-    canEdit: isAssignee || Boolean(project?.canEdit),
-    canManage: Boolean(project?.canManage),
+    canUpdateProgress: isAssignee || isOwner || Boolean(project?.canManage),
+    canEdit: isAssignee || isOwner || Boolean(project?.canEdit),
+    canManage: isOwner || Boolean(project?.canManage),
     canComment: canView,
     isAssignee,
   };
@@ -128,7 +134,7 @@ export async function requireTaskAccess(taskId: string, level: keyof Omit<TaskAc
   const user = await requireUser();
   const task = await db.task.findUnique({
     where: { id: taskId },
-    select: { id: true, projectId: true, assignees: { select: { userId: true } } },
+    select: { id: true, projectId: true, createdById: true, assignees: { select: { userId: true } } },
   });
   if (!task) throw new UnauthorizedError("Task not found.");
   const access = await getTaskAccess(user, task, db);
@@ -136,9 +142,9 @@ export async function requireTaskAccess(taskId: string, level: keyof Omit<TaskAc
   return { user, access, task };
 }
 
-/** Ids of the projects a member can see (every project for global managers → null). */
+/** Ids of the projects the user belongs to (every project for admins → null). */
 export async function visibleProjectIds(user: CurrentUser, db: Db = prisma): Promise<string[] | null> {
-  if (user.role !== "MEMBER") return null;
+  if (user.role === "ADMIN") return null;
   const rows = await db.projectMember.findMany({ where: { userId: user.id }, select: { projectId: true } });
   return rows.map((r) => r.projectId);
 }

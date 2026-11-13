@@ -93,7 +93,7 @@ export function ProjectView({
           options={options}
           canEdit={access.canEdit}
           canManage={access.canManage}
-          canDelete={access.isGlobalManager}
+          canDelete={access.isGlobalManager || access.role === "OWNER"}
           backHref={basePath === "/projects" ? "/workspaces" : basePath}
         />
       </PageHeader>

@@ -8,7 +8,7 @@ import { logActivity, notifyManagers, notifyUsers } from "@/lib/activity";
 import { assertActiveUsers, assigneeNames, syncTaskAssignees } from "@/lib/assignees";
 import { parseDateInput } from "@/lib/dates";
 import { getProjectAccess, requireTaskAccess, requireUser } from "@/lib/permissions";
-import { ensureProjectMembers, resolveProjectPlacement, revalidateProjectViews } from "@/lib/project-members";
+import { ensureManagerInProject, ensureProjectMembers, resolveProjectPlacement, revalidateProjectViews } from "@/lib/project-members";
 import { revalidateTaskViews } from "@/lib/task-views";
 import { resolvePlan } from "@/lib/recurrence";
 import { assertNotBlocked, onTaskCompleted } from "@/lib/task-events";
@@ -119,7 +119,10 @@ export async function createTask(input: unknown) {
         },
       });
 
-      if (where.project) await ensureProjectMembers(tx, where.project, assignees.map((a) => a.id), manager.id);
+      if (where.project) {
+        await ensureProjectMembers(tx, where.project, assignees.map((a) => a.id), manager.id);
+        await ensureManagerInProject(tx, where.project, manager);
+      }
       await logActivity(
         {
           actorId: manager.id,
@@ -198,7 +201,10 @@ export async function updateTask(id: string, input: unknown) {
         },
       });
       const { added } = await syncTaskAssignees(tx, id, values.assigneeIds, manager.id);
-      if (where.project) await ensureProjectMembers(tx, where.project, assignees.map((a) => a.id), manager.id);
+      if (where.project) {
+        await ensureProjectMembers(tx, where.project, assignees.map((a) => a.id), manager.id);
+        await ensureManagerInProject(tx, where.project, manager);
+      }
       const before = currentAssignees(existing);
       const assigneesChanged = added.length > 0 || before.length !== assignees.length;
 
@@ -361,7 +367,7 @@ export async function setTaskAssignees(input: unknown) {
     const { id, assigneeIds } = assigneesSchema.parse(input);
     const { user: manager, task: t } = await requireTaskAccess(id, "canManage");
     await assertAssigneesAllowed(manager, t.projectId, assigneeIds);
-    const task = await prisma.$transaction(async (tx) => applyAssignees(tx, id, assigneeIds, manager.id));
+    const task = await prisma.$transaction(async (tx) => applyAssignees(tx, id, assigneeIds, manager));
     revalidateTaskViews(task.id);
     if (task.projectId) revalidateProjectViews(task.projectId);
     return { id: task.id, assigneeIds };
@@ -379,7 +385,7 @@ export async function toggleTaskAssignee(input: unknown) {
       const ids = current.map((a) => a.userId);
       const next = assigned ? [...ids.filter((u) => u !== userId), userId] : ids.filter((u) => u !== userId);
       if (next.length === 0) throw new ActionError("A task needs at least one assignee.");
-      return applyAssignees(tx, id, next, manager.id);
+      return applyAssignees(tx, id, next, manager);
     });
     revalidateTaskViews(task.id);
     if (task.projectId) revalidateProjectViews(task.projectId);
@@ -387,7 +393,8 @@ export async function toggleTaskAssignee(input: unknown) {
   });
 }
 
-async function applyAssignees(tx: Tx, id: string, assigneeIds: string[], actorId: string) {
+async function applyAssignees(tx: Tx, id: string, assigneeIds: string[], actor: CurrentUser) {
+  const actorId = actor.id;
   const existing = await tx.task.findUnique({ where: { id }, include: assigneeInclude });
   if (!existing) throw new ActionError("Task not found.");
   const assignees = await assertActiveUsers(tx, assigneeIds);
@@ -403,7 +410,10 @@ async function applyAssignees(tx: Tx, id: string, assigneeIds: string[], actorId
   });
   const { added, removed } = await syncTaskAssignees(tx, id, assigneeIds, actorId);
   if (added.length === 0 && removed.length === 0) return updated;
-  if (updated.project) await ensureProjectMembers(tx, updated.project, added, actorId);
+  if (updated.project) {
+    await ensureProjectMembers(tx, updated.project, added, actorId);
+    await ensureManagerInProject(tx, updated.project, actor);
+  }
 
   await logActivity(
     {

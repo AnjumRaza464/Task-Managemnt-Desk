@@ -99,9 +99,11 @@ export async function updateProject(id: string, input: unknown) {
   });
 }
 
+/** Admins may delete any project; a manager only the projects they own (created). */
 export async function deleteProject(id: string) {
   return runAction(async () => {
-    const manager = await requireManager();
+    const { user: manager, access } = await requireProjectAccess(id, "manage");
+    if (!access.isGlobalManager && access.role !== "OWNER") throw new ActionError("Only the project owner or an admin can delete a project.");
     const project = await prisma.project.findUnique({ where: { id }, include: { _count: { select: { tasks: true } } } });
     if (!project) throw new ActionError("Project not found.");
     await prisma.$transaction(async (tx) => {

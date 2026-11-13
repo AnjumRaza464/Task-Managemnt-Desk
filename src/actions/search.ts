@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-guard";
 import { MONTH_NAMES, ROLE_LABELS, STATUS_LABELS } from "@/lib/constants";
+import type { Prisma } from "@/generated/prisma/client";
 
 export type SearchHit = { id: string; label: string; detail?: string; href: string };
 
@@ -31,10 +32,15 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
 
   const contains = { contains: q, mode: "insensitive" as const };
 
-  if (user.role === "MEMBER") {
+  if (user.role !== "ADMIN") {
+    // Members: their tasks and projects. Managers: also the tasks they created and the projects they belong to.
+    const mine: Prisma.TaskWhereInput =
+      user.role === "MANAGER"
+        ? { OR: [{ assignees: { some: { userId: user.id } } }, { createdById: user.id }, { project: { members: { some: { userId: user.id } } } }] }
+        : { assignees: { some: { userId: user.id } } };
     const [tasks, files, projects] = await Promise.all([
       prisma.task.findMany({
-        where: { assignees: { some: { userId: user.id } }, OR: [{ title: contains }, { description: contains }] },
+        where: { AND: [mine, { OR: [{ title: contains }, { description: contains }] }] },
         select: { id: true, title: true, status: true, dueDate: true },
         orderBy: { dueDate: "desc" },
         take: TAKE.tasks,
@@ -42,7 +48,7 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
       prisma.sharedFile.findMany({
         where: {
           AND: [
-            { OR: [{ isPublic: true }, { recipients: { some: { userId: user.id } } }] },
+            { OR: [{ isPublic: true }, { recipients: { some: { userId: user.id } } }, { sharedById: user.id }] },
             { OR: [{ fileName: contains }, { note: contains }] },
           ],
         },

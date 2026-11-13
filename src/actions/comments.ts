@@ -232,7 +232,7 @@ export async function deleteComment(id: string) {
     });
     if (!comment) throw new ActionError("Comment not found.");
 
-    let allowed = comment.authorId === user.id || user.role !== "MEMBER";
+    let allowed = comment.authorId === user.id || user.role === "ADMIN";
     if (!allowed) {
       const projectId = comment.projectId ?? comment.task?.projectId ?? null;
       const access = projectId ? await getProjectAccess(user, projectId) : null;

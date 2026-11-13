@@ -33,6 +33,11 @@ function projectStats(tasks: { status: string; completion: number }[]) {
 }
 
 /** Every workspace with its projects (members only see projects they belong to). */
+/**
+ * Workspaces with their projects. Admins get all of them; a manager gets the
+ * workspaces that hold a project they belong to, plus the ones they created
+ * (so a fresh workspace is not invisible before its first project).
+ */
 export async function getWorkspacesOverview(user: CurrentUser) {
   const ids = await visibleProjectIds(user);
   const workspaces = await prisma.workspace.findMany({
@@ -43,6 +48,7 @@ export async function getWorkspacesOverview(user: CurrentUser) {
       description: true,
       color: true,
       createdAt: true,
+      createdById: true,
       projects: {
         where: ids ? { id: { in: ids } } : undefined,
         orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -55,8 +61,9 @@ export async function getWorkspacesOverview(user: CurrentUser) {
       ...w,
       projects: w.projects.map(({ tasks, ...p }) => ({ ...p, stats: projectStats(tasks) })),
     }))
-    .filter((w) => !ids || w.projects.length > 0);
+    .filter((w) => !ids || w.projects.length > 0 || w.createdById === user.id);
 }
+
 
 export type WorkspaceOverview = Awaited<ReturnType<typeof getWorkspacesOverview>>[number];
 export type ProjectCard = WorkspaceOverview["projects"][number];

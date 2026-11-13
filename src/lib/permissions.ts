@@ -102,13 +102,26 @@ export type TaskAccess = {
 
 export type TaskForAccess = { id: string; projectId: string | null; createdById: string; assignees: { userId: string }[] };
 
+const NO_TASK_ACCESS = (isAssignee: boolean): TaskAccess => ({ canView: false, canUpdateProgress: false, canEdit: false, canManage: false, canComment: false, isAssignee });
+
+/**
+ * Where-clause for the tasks a user may see inside a project: a manager only
+ * their own (created or assigned to them); admins and members see them all
+ * (undefined = no extra filter).
+ */
+export function ownTasksWhere(user: CurrentUser): Prisma.TaskWhereInput | undefined {
+  if (user.role !== "MANAGER") return undefined;
+  return { OR: [{ createdById: user.id }, { assignees: { some: { userId: user.id } } }] };
+}
+
 export async function getTaskAccess(user: CurrentUser, task: TaskForAccess, db: Db = prisma): Promise<TaskAccess> {
   const isAssignee = task.assignees.some((a) => a.userId === user.id);
   if (user.role === "ADMIN") {
     return { canView: true, canUpdateProgress: true, canEdit: true, canManage: true, canComment: true, isAssignee };
   }
-  // A manager keeps full control of the tasks they created (also the ones outside any project).
+  // A manager only sees the tasks they created or are assigned to, and keeps full control of those.
   const isOwner = user.role === "MANAGER" && task.createdById === user.id;
+  if (user.role === "MANAGER" && !isOwner && !isAssignee) return NO_TASK_ACCESS(isAssignee);
   const project = task.projectId ? await getProjectAccess(user, task.projectId, db) : null;
   const canView = isAssignee || isOwner || Boolean(project?.canView);
   return {

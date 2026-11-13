@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { CurrentUser } from "@/lib/auth-guard";
-import { getProjectAccess, visibleProjectIds } from "@/lib/permissions";
+import { getProjectAccess, ownTasksWhere, visibleProjectIds } from "@/lib/permissions";
 import { assigneeSelect } from "@/lib/queries/selects";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -40,6 +40,7 @@ function projectStats(tasks: { status: string; completion: number }[]) {
  */
 export async function getWorkspacesOverview(user: CurrentUser) {
   const ids = await visibleProjectIds(user);
+  const own = ownTasksWhere(user);
   const workspaces = await prisma.workspace.findMany({
     orderBy: { createdAt: "asc" },
     select: {
@@ -52,7 +53,8 @@ export async function getWorkspacesOverview(user: CurrentUser) {
       projects: {
         where: ids ? { id: { in: ids } } : undefined,
         orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-        select: projectCardSelect,
+        // Counts and progress cover only the tasks the viewer may see (a manager: their own).
+        select: { ...projectCardSelect, tasks: { where: own, select: { status: true, completion: true } } },
       },
     },
   });
@@ -83,15 +85,18 @@ export const projectTaskInclude = {
 
 export type ProjectTask = Prisma.TaskGetPayload<{ include: typeof projectTaskInclude }>;
 
-/** Full project page data, or null when it does not exist / the user may not see it. */
+/**
+ * Full project page data, or null when it does not exist / the user may not
+ * see it. A manager gets only the tasks they created or are assigned to.
+ */
 export async function getProjectForUser(id: string, user: CurrentUser) {
   // Access check and the project load run in parallel; the result is dropped when access is denied.
-  const [access, project] = await Promise.all([getProjectAccess(user, id), loadProject(id)]);
+  const [access, project] = await Promise.all([getProjectAccess(user, id), loadProject(id, ownTasksWhere(user))]);
   if (!access || !project) return null;
   return { project, access, stats: projectStats(project.tasks) };
 }
 
-function loadProject(id: string) {
+function loadProject(id: string, own: Prisma.TaskWhereInput | undefined) {
   return prisma.project.findUnique({
     where: { id },
     include: {
@@ -104,9 +109,9 @@ function loadProject(id: string) {
       lists: { orderBy: { position: "asc" } },
       milestones: {
         orderBy: [{ position: "asc" }, { dueDate: "asc" }],
-        include: { tasks: { select: { id: true, status: true, completion: true } } },
+        include: { tasks: { where: own, select: { id: true, status: true, completion: true } } },
       },
-      tasks: { include: projectTaskInclude, orderBy: [{ position: "asc" }, { dueDate: "asc" }] },
+      tasks: { where: own, include: projectTaskInclude, orderBy: [{ position: "asc" }, { dueDate: "asc" }] },
       comments: {
         where: { parentId: null, kind: "DISCUSSION" },
         orderBy: { createdAt: "desc" },

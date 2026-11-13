@@ -94,25 +94,16 @@ export async function notifyUsers(input: NotifyInput, tx: Tx = prisma): Promise<
 }
 
 /**
- * Same as notifyUsers for the people who run the work: every active admin,
- * plus the managers who belong to the task's / the given project (a manager
- * only hears about the projects they are part of) and the task's creator.
+ * Same as notifyUsers for the people who run the work: every active admin
+ * plus the task's creator. Other managers are left out on purpose: a manager
+ * only sees the tasks they created or are assigned to.
  */
 export async function notifyManagers(input: Omit<NotifyInput, "userIds">, tx: Tx = prisma): Promise<string[]> {
-  let projectId = input.projectId ?? null;
-  let creatorId: string | null = null;
-  if (input.taskId) {
-    const task = await tx.task.findUnique({ where: { id: input.taskId }, select: { projectId: true, createdById: true } });
-    projectId = projectId ?? task?.projectId ?? null;
-    creatorId = task?.createdById ?? null;
-  }
-  const [admins, members] = await Promise.all([
+  const [admins, task] = await Promise.all([
     tx.user.findMany({ where: { role: "ADMIN", isActive: true }, select: { id: true } }),
-    projectId
-      ? tx.projectMember.findMany({ where: { projectId, user: { role: "MANAGER", isActive: true } }, select: { userId: true } })
-      : Promise.resolve([]),
+    input.taskId ? tx.task.findUnique({ where: { id: input.taskId }, select: { createdById: true } }) : Promise.resolve(null),
   ]);
-  const userIds = [...admins.map((a) => a.id), ...members.map((m) => m.userId)];
-  if (creatorId) userIds.push(creatorId);
+  const userIds = admins.map((a) => a.id);
+  if (task?.createdById) userIds.push(task.createdById);
   return notifyUsers({ ...input, userIds }, tx);
 }

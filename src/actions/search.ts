@@ -33,10 +33,10 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
   const contains = { contains: q, mode: "insensitive" as const };
 
   if (user.role !== "ADMIN") {
-    // Members: their tasks and projects. Managers: also the tasks they created and the projects they belong to.
+    // Members: the tasks assigned to them. Managers: those plus the tasks they created.
     const mine: Prisma.TaskWhereInput =
       user.role === "MANAGER"
-        ? { OR: [{ assignees: { some: { userId: user.id } } }, { createdById: user.id }, { project: { members: { some: { userId: user.id } } } }] }
+        ? { OR: [{ assignees: { some: { userId: user.id } } }, { createdById: user.id }] }
         : { assignees: { some: { userId: user.id } } };
     const [tasks, files, projects] = await Promise.all([
       prisma.task.findMany({

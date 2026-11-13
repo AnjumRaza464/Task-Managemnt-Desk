@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, FolderKanban, FolderPlus, ListTodo, Plus } from "lucide-react";
+import { Building2, FolderKanban, FolderOpen, FolderPlus, ListTodo, Plus } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +15,7 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -26,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
 import { BrandLogo, BrandMark } from "@/components/shared/brand-logo";
+import { NavLinkIcon } from "@/components/layout/nav-pending";
 import { UserMenu } from "@/components/layout/user-menu";
 import { ProjectDialog, type ProjectFormValues } from "@/components/projects/project-dialog";
 import { WorkspaceDialog } from "@/components/projects/workspace-dialog";
@@ -45,12 +47,15 @@ export function MemberSidebar({
   workspaces,
   canManage = false,
   users = [],
+  unseenFiles = 0,
 }: {
   user: CurrentUser;
   workspaces: SidebarWorkspace[];
   canManage?: boolean;
   /** People a manager can add to a new project. */
   users?: UserOption[];
+  /** Files shared with the user that they have not opened yet (badge on Files). */
+  unseenFiles?: number;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -72,6 +77,29 @@ export function MemberSidebar({
       </SidebarHeader>
 
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton isActive={isActive("/my-tasks")} tooltip="My tasks" render={<Link href="/my-tasks" prefetch />}>
+                  <NavLinkIcon icon={ListTodo} />
+                  <span>My tasks</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton isActive={isActive("/my-files")} tooltip="Files" render={<Link href="/my-files" prefetch />}>
+                  <NavLinkIcon icon={FolderOpen} />
+                  <span>Files</span>
+                </SidebarMenuButton>
+                {unseenFiles > 0 && (
+                  <SidebarMenuBadge className="bg-primary text-primary-foreground" title={`${unseenFiles} new ${unseenFiles === 1 ? "file" : "files"}`}>
+                    {unseenFiles > 99 ? "99+" : unseenFiles}
+                  </SidebarMenuBadge>
+                )}
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         <SidebarGroup>
           <SidebarGroupLabel>Workspaces</SidebarGroupLabel>

@@ -1,4 +1,5 @@
 import type { CurrentUser } from "@/lib/auth-guard";
+import { getUnseenFileCount } from "@/lib/queries/files";
 import { getUnreadNotificationCount } from "@/lib/queries/notifications";
 import { getMyProjects, getWorkspacesOverview } from "@/lib/queries/projects";
 import { getAssignableUsers } from "@/lib/queries/users";
@@ -15,8 +16,9 @@ import { InstallBanner } from "@/components/pwa/install-banner";
  */
 export async function WorkspaceShell({ user, children }: { user: CurrentUser; children: React.ReactNode }) {
   const isManager = user.role !== "MEMBER";
-  const [unreadNotifications, projects, all, users] = await Promise.all([
+  const [unreadNotifications, unseenFiles, projects, all, users] = await Promise.all([
     getUnreadNotificationCount(user.id),
+    getUnseenFileCount(user.id),
     isManager ? Promise.resolve([]) : getMyProjects(user.id),
     isManager ? getWorkspacesOverview(user) : Promise.resolve([]),
     // Managers can create projects from the sidebar, so they need the people picker.
@@ -52,7 +54,7 @@ export async function WorkspaceShell({ user, children }: { user: CurrentUser; ch
 
   return (
     <SidebarProvider>
-      <MemberSidebar user={user} workspaces={workspaces} canManage={isManager} users={users} />
+      <MemberSidebar user={user} workspaces={workspaces} canManage={isManager} users={users} unseenFiles={unseenFiles} />
       <SidebarInset>
         <MemberHeader unreadCount={unreadNotifications} projectNames={names} />
         <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">

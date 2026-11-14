@@ -11,7 +11,7 @@ export async function getNotifications(userId: string, filter: "all" | "unread" 
     orderBy: { createdAt: "desc" },
     take: 100,
     include: {
-      task: { select: { id: true, title: true } },
+      task: { select: { id: true, title: true, projectId: true } },
       project: { select: { id: true, name: true } },
     },
   });

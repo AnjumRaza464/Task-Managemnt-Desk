@@ -80,7 +80,16 @@ export function MemberProjectView({
   }
   const [query, setQuery] = useState("");
   const [who, setWho] = useState("");
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  // ?task=<id> (from My tasks or a notification) lands on the board with that task's modal open.
+  const [openTaskId, setOpenTaskId] = useState<string | null>(searchParams.get("task"));
+  function closeTask() {
+    setOpenTaskId(null);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("task")) {
+      url.searchParams.delete("task");
+      window.history.replaceState(window.history.state, "", url.toString());
+    }
+  }
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -362,7 +371,7 @@ export function MemberProjectView({
         />
       )}
 
-      <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && setOpenTaskId(null)} users={users} taskHref="/my-tasks" options={options} />
+      <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && closeTask()} users={users} taskHref="/my-tasks" options={options} />
       {options && (
         <TaskFormDialog
           open={creatingIn !== false}

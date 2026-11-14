@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarDays, CheckCircle2, Circle, ExternalLink, FileText, Flag, Loader2, Lock, MessageSquare, Paperclip, Pencil, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { moveTaskToList } from "@/actions/lists";
 import { updateSubtask } from "@/actions/subtasks";
 import { uploadAttachment } from "@/actions/attachments";
 import { deleteTask } from "@/actions/tasks";
@@ -17,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { AssigneeAvatars } from "@/components/shared/assignee-avatars";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
+import { SelectField } from "@/components/shared/select-field";
 import { MyTaskControls } from "@/components/member/my-task-controls";
 import { TaskConversation } from "@/components/member/task-conversation";
 import type { MentionUser } from "@/components/tasks/mention-composer";
@@ -49,6 +51,7 @@ export function TaskModal({
   const [error, setError] = useState<string | null>(null);
   const [pane, setPane] = useState<"details" | "chat">("details");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [moving, startMove] = useTransition();
   const [uploading, startUpload] = useTransition();
   const [, startTransition] = useTransition();
 
@@ -80,6 +83,24 @@ export function TaskModal({
       if (result.ok) setTask(result.data);
     });
     router.refresh();
+  }
+
+  /** Moves the task to another Kanban column; the board behind the modal updates on refresh. */
+  function moveToList(listId: string | null) {
+    if (!task || (task.listId ?? null) === listId) return;
+    const target = task.project?.lists.find((l) => l.id === listId) ?? null;
+    // Show the new column at once; the server result replaces it.
+    setTask({ ...task, listId, list: target });
+    startMove(async () => {
+      const result = await moveTaskToList({ id: task.id, listId });
+      if (!result.ok) {
+        toast.error(result.error);
+        reload();
+        return;
+      }
+      toast.success(`Moved to ${target?.name ?? "Unsorted"}`);
+      reload();
+    });
   }
 
   function toggleSubtask(id: string, isCompleted: boolean) {
@@ -231,6 +252,24 @@ export function TaskModal({
                   <Field label="Created by">{task.createdBy.name}</Field>
                   <Field label="Completed">{formatDate(task.completedAt)}</Field>
                 </section>
+
+                {task.project && task.project.lists.length > 0 && task.access.canEdit && (
+                  <section className="rounded-xl border p-4">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Kanban column</p>
+                      {moving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+                    </div>
+                    <SelectField
+                      id="task-list"
+                      value={task.listId ?? ""}
+                      onChange={(v) => moveToList(v || null)}
+                      disabled={moving}
+                      placeholder="Unsorted"
+                      options={[{ value: "", label: "Unsorted" }, ...task.project.lists.map((l) => ({ value: l.id, label: l.name }))].filter((o) => o.value || task.listId)}
+                    />
+                    <p className="mt-1.5 text-xs text-muted-foreground">Same as dragging the card on the board: pick the column this task should sit in.</p>
+                  </section>
+                )}
 
                 {openBlockers.length > 0 && (
                   <div className="flex items-start gap-2 rounded-lg border border-amber-300/50 bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">

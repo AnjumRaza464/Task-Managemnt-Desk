@@ -30,6 +30,9 @@ import {
 } from "@/actions/notifications";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
+import { TaskModal } from "@/components/member/task-modal";
+import type { MentionUser } from "@/components/tasks/mention-composer";
+import type { TaskFormOptions } from "@/lib/queries/tasks";
 import { cn, formatDateTime, timeAgo } from "@/lib/utils";
 import type { NotificationType } from "@/generated/prisma/enums";
 
@@ -40,7 +43,7 @@ type Notification = {
   message: string;
   isRead: boolean;
   createdAt: Date;
-  task: { id: string; title: string } | null;
+  task: { id: string; title: string; projectId: string | null } | null;
   project: { id: string; name: string } | null;
 };
 
@@ -65,18 +68,26 @@ export function NotificationList({
   taskHref = "/tasks",
   projectHref = "/projects",
   basePath = "/notifications",
+  taskModal = null,
 }: {
   notifications: Notification[];
   filter: "all" | "unread";
   unreadCount: number;
   /** Base path for task links (members use /my-tasks). */
   taskHref?: string;
+  /**
+   * When set, "Open task" goes to the task's project board with the task modal
+   * open (like clicking it on the Kanban); tasks outside a project open the
+   * modal right here.
+   */
+  taskModal?: { users: MentionUser[]; options?: TaskFormOptions | null } | null;
   /** Base path for project links (members use /my-projects). */
   projectHref?: string;
   /** This page's own path, for the All / Unread filter links. */
   basePath?: string;
 }) {
   const router = useRouter();
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkPending, startBulk] = useTransition();
   const [, startTransition] = useTransition();
@@ -182,7 +193,20 @@ export function NotificationList({
                     </span>
                   </div>
                   <p className="mt-0.5 text-sm text-muted-foreground">{n.message}</p>
-                  {n.task && (
+                  {n.task && taskModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!n.isRead) void markNotificationRead(n.id, true);
+                        if (n.task!.projectId) router.push(`/my-projects/${n.task!.projectId}?task=${n.task!.id}`);
+                        else setOpenTaskId(n.task!.id);
+                      }}
+                      className="mt-1 inline-block text-xs font-medium text-primary hover:underline"
+                    >
+                      Open task →
+                    </button>
+                  )}
+                  {n.task && !taskModal && (
                     <Link
                       href={`${taskHref}/${n.task.id}`}
                       onClick={() => {
@@ -242,6 +266,20 @@ export function NotificationList({
             );
           })}
         </ul>
+      )}
+      {taskModal && (
+        <TaskModal
+          taskId={openTaskId}
+          onOpenChange={(o) => {
+            if (!o) {
+              setOpenTaskId(null);
+              router.refresh();
+            }
+          }}
+          users={taskModal.users}
+          taskHref={taskHref}
+          options={taskModal.options ?? null}
+        />
       )}
     </div>
   );

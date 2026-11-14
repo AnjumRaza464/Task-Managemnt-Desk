@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckSquare, MessageSquare, Paperclip, Users } from "lucide-react";
 import { TaskModal } from "@/components/member/task-modal";
 import type { MentionUser } from "@/components/tasks/mention-composer";
@@ -10,9 +11,9 @@ import type { TaskFormOptions, TaskListItem } from "@/lib/queries/tasks";
 import { formatDate } from "@/lib/utils";
 
 /**
- * The task cards on My tasks. Clicking one opens the same task modal as the
- * project board and list (details on the left, chat / discussion on the
- * right) instead of leaving the page.
+ * The task cards on My tasks. Clicking one goes to the task's project board
+ * with the task modal open, exactly like clicking it on the Kanban. Tasks
+ * outside any project open the modal right here.
  */
 export function MyTaskList({
   tasks,
@@ -25,7 +26,12 @@ export function MyTaskList({
   users: MentionUser[];
   options?: TaskFormOptions | null;
 }) {
+  const router = useRouter();
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const open = (task: TaskListItem) => {
+    if (task.projectId) router.push(`/my-projects/${task.projectId}?task=${task.id}`);
+    else setOpenTaskId(task.id);
+  };
 
   return (
     <>
@@ -40,11 +46,11 @@ export function MyTaskList({
               tabIndex={0}
               aria-label={`Open ${task.title}`}
               className="cursor-pointer transition-colors hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-              onClick={() => setOpenTaskId(task.id)}
+              onClick={() => open(task)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  setOpenTaskId(task.id);
+                  open(task);
                 }
               }}
             >

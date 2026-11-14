@@ -17,7 +17,7 @@ export async function getTaskPanel(taskId: string) {
         assignees: { orderBy: { createdAt: "asc" }, select: { userId: true, user: { select: { id: true, name: true, email: true } } } },
         createdBy: { select: { id: true, name: true } },
         category: { select: { id: true, name: true, color: true } },
-        project: { select: { id: true, name: true, color: true } },
+        project: { select: { id: true, name: true, color: true, lists: { orderBy: { position: "asc" }, select: { id: true, name: true } } } },
         list: { select: { id: true, name: true } },
         milestone: { select: { id: true, title: true } },
         subtasks: { orderBy: { position: "asc" }, select: { id: true, title: true, isCompleted: true } },

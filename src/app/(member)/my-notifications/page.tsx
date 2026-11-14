@@ -3,6 +3,8 @@ import { requireMemberPage } from "@/lib/auth-guard";
 import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { getNotifications, getUnreadNotificationCount } from "@/lib/queries/notifications";
+import { getTaskFormOptions } from "@/lib/queries/tasks";
+import { getAssignableUsers } from "@/lib/queries/users";
 import { PageHeader } from "@/components/shared/page-header";
 import { NotificationList } from "@/components/notifications/notification-list";
 
@@ -14,7 +16,13 @@ export default async function MemberNotificationsPage({ searchParams }: PageProp
   after(() => syncOverdueTasks());
   const params = await searchParams;
   const filter = params.filter === "unread" ? "unread" : "all";
-  const [notifications, unreadCount] = await Promise.all([getNotifications(user.id, filter), getUnreadNotificationCount(user.id)]);
+  // The task modal needs the people to @mention and, for managers, the form options for Edit.
+  const [notifications, unreadCount, users, options] = await Promise.all([
+    getNotifications(user.id, filter),
+    getUnreadNotificationCount(user.id),
+    getAssignableUsers(),
+    user.role === "MEMBER" ? Promise.resolve(null) : getTaskFormOptions(user),
+  ]);
 
   return (
     <>
@@ -29,6 +37,7 @@ export default async function MemberNotificationsPage({ searchParams }: PageProp
         taskHref="/my-tasks"
         projectHref="/my-projects"
         basePath="/my-notifications"
+        taskModal={{ users, options }}
       />
     </>
   );

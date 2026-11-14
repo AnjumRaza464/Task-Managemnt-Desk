@@ -15,6 +15,7 @@ import { requireManagerPage } from "@/lib/auth-guard";
 import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { getDashboardData } from "@/lib/queries/dashboard";
+import { taskOpenHref } from "@/lib/task-links";
 import { activityDetail, activityLabel } from "@/lib/activity-format";
 import { cn, formatDate, timeAgo } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -152,7 +153,7 @@ export default async function DashboardPage() {
                       {readOnly ? (
                         <p className="truncate text-sm font-medium">{task.title}</p>
                       ) : (
-                        <Link href={`/tasks/${task.id}`} className="block truncate text-sm font-medium hover:underline">
+                        <Link href={taskOpenHref(task)} className="block truncate text-sm font-medium hover:underline">
                           {task.title}
                         </Link>
                       )}
@@ -196,7 +197,7 @@ export default async function DashboardPage() {
                             {readOnly ? (
                               <span className="font-medium">{a.task.title}</span>
                             ) : (
-                              <Link href={`/tasks/${a.task.id}`} className="font-medium hover:underline">
+                              <Link href={taskOpenHref(a.task)} className="font-medium hover:underline">
                                 {a.task.title}
                               </Link>
                             )}

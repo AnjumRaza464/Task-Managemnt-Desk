@@ -133,7 +133,7 @@ function loadProject(id: string, own: Prisma.TaskWhereInput | undefined) {
       activity: {
         orderBy: { createdAt: "desc" },
         take: 30,
-        include: { actor: { select: { name: true } }, task: { select: { id: true, title: true } } },
+        include: { actor: { select: { name: true } }, task: { select: { id: true, title: true, projectId: true } } },
       },
     },
   });

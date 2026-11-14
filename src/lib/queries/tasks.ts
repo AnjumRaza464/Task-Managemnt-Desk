@@ -161,8 +161,8 @@ export async function getTaskById(id: string) {
       project: { select: { id: true, name: true, color: true, workspace: { select: { id: true, name: true } } } },
       list: { select: { id: true, name: true } },
       milestone: { select: { id: true, title: true, dueDate: true, completedAt: true } },
-      blockedBy: { select: { blocker: { select: { id: true, title: true, status: true, dueDate: true } } } },
-      blocks: { select: { blocked: { select: { id: true, title: true, status: true, dueDate: true } } } },
+      blockedBy: { select: { blocker: { select: { id: true, title: true, status: true, dueDate: true, projectId: true } } } },
+      blocks: { select: { blocked: { select: { id: true, title: true, status: true, dueDate: true, projectId: true } } } },
       subtasks: { orderBy: { position: "asc" } },
       comments: {
         where: { parentId: null, kind: "DISCUSSION" },

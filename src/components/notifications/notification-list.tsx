@@ -69,6 +69,7 @@ export function NotificationList({
   projectHref = "/projects",
   basePath = "/notifications",
   taskModal = null,
+  boardHref = "/my-projects",
 }: {
   notifications: Notification[];
   filter: "all" | "unread";
@@ -81,6 +82,8 @@ export function NotificationList({
    * modal right here.
    */
   taskModal?: { users: MentionUser[]; options?: TaskFormOptions | null } | null;
+  /** Base path of the project board the task opens on (/my-projects for the workspace area, /projects for admins). */
+  boardHref?: string;
   /** Base path for project links (members use /my-projects). */
   projectHref?: string;
   /** This page's own path, for the All / Unread filter links. */
@@ -198,7 +201,7 @@ export function NotificationList({
                       type="button"
                       onClick={() => {
                         if (!n.isRead) void markNotificationRead(n.id, true);
-                        if (n.task!.projectId) router.push(`/my-projects/${n.task!.projectId}?task=${n.task!.id}`);
+                        if (n.task!.projectId) router.push(`${boardHref}/${n.task!.projectId}?task=${n.task!.id}`);
                         else setOpenTaskId(n.task!.id);
                       }}
                       className="mt-1 inline-block text-xs font-medium text-primary hover:underline"

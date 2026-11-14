@@ -11,9 +11,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StatusBadge } from "@/components/shared/badges";
 import { SelectField } from "@/components/shared/select-field";
 import { cn, formatDate } from "@/lib/utils";
+import { taskOpenHref } from "@/lib/task-links";
 import type { TaskStatus } from "@/generated/prisma/enums";
 
-type Ref = { id: string; title: string; status: TaskStatus; dueDate: Date };
+type Ref = { id: string; title: string; status: TaskStatus; dueDate: Date; projectId?: string | null };
 type Candidate = { id: string; title: string; status: TaskStatus };
 
 const OPEN: TaskStatus[] = ["PENDING", "IN_PROGRESS", "OVERDUE"];
@@ -71,7 +72,7 @@ export function DependencyCard({
   function row(t: Ref, key: string, onRemove?: () => void) {
     return (
       <li key={t.id} className="flex items-center gap-2 py-1.5 text-sm">
-        <Link href={`${taskHref}/${t.id}`} className={cn("min-w-0 flex-1 truncate hover:underline", t.status === "COMPLETED" && "text-muted-foreground line-through")}>
+        <Link href={taskOpenHref(t, taskHref)} className={cn("min-w-0 flex-1 truncate hover:underline", t.status === "COMPLETED" && "text-muted-foreground line-through")}>
           {t.title}
         </Link>
         <span className="hidden text-xs text-muted-foreground sm:inline">{formatDate(t.dueDate, "MMM d")}</span>

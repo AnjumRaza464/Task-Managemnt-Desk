@@ -18,6 +18,7 @@ import { AssigneeAvatars, assigneeLabel } from "@/components/shared/assignee-ava
 import { CategoryBadge, PriorityBadge } from "@/components/shared/badges";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TaskFormDialog, taskToFormValues, type TaskFormValues } from "@/components/tasks/task-form-dialog";
+import { TaskModal } from "@/components/member/task-modal";
 import { STATUS_COLORS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import type { TaskFormOptions, TaskListItem } from "@/lib/queries/tasks";
@@ -38,6 +39,8 @@ export function KanbanBoard({ tasks: initial, options }: { tasks: TaskListItem[]
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStatus, setOverStatus] = useState<TaskStatus | null>(null);
   const [editing, setEditing] = useState<TaskFormValues | null>(null);
+  // Clicking a card title opens the task in the same modal (details + chat) the project boards use.
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<TaskListItem | null>(null);
   const [, startTransition] = useTransition();
 
@@ -122,6 +125,7 @@ export function KanbanBoard({ tasks: initial, options }: { tasks: TaskListItem[]
                         setDragId(null);
                         setOverStatus(null);
                       }}
+                      onOpen={() => setOpenTaskId(task.id)}
                       onEdit={() => setEditing(taskToFormValues(task))}
                       onDelete={() => setDeleting(task)}
                     />
@@ -133,6 +137,7 @@ export function KanbanBoard({ tasks: initial, options }: { tasks: TaskListItem[]
         })}
       </div>
 
+      <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && setOpenTaskId(null)} users={options.users} taskHref="/tasks" options={options} />
       <TaskFormDialog
         open={Boolean(editing)}
         onOpenChange={(o) => !o && setEditing(null)}
@@ -163,6 +168,7 @@ function KanbanCard({
   dragging,
   onDragStart,
   onDragEnd,
+  onOpen,
   onEdit,
   onDelete,
 }: {
@@ -170,6 +176,7 @@ function KanbanCard({
   dragging: boolean;
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
+  onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -187,13 +194,17 @@ function KanbanCard({
       )}
     >
       <div className="flex items-start gap-1">
-        <Link
-          href={`/tasks/${task.id}`}
+        <button
+          type="button"
+          onClick={onOpen}
           draggable={false}
-          className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug hover:underline"
+          className={cn(
+            "line-clamp-2 min-w-0 flex-1 cursor-pointer text-left text-sm font-medium leading-snug hover:underline",
+            task.status === "COMPLETED" && "text-muted-foreground line-through",
+          )}
         >
           {task.title}
-        </Link>
+        </button>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={<Button variant="ghost" size="icon-xs" className="-mt-0.5 -mr-1 shrink-0" aria-label="Task actions" />}

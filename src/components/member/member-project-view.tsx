@@ -83,6 +83,13 @@ export function MemberProjectView({
   const [who, setWho] = useState("");
   // ?task=<id> (from My tasks or a notification) lands on the board with that task's modal open.
   const [openTaskId, setOpenTaskId] = useState<string | null>(searchParams.get("task"));
+  // Links inside the project (timeline, milestones, activity) change the URL while this view stays mounted.
+  const taskParam = searchParams.get("task");
+  const [seenTaskParam, setSeenTaskParam] = useState(taskParam);
+  if (taskParam !== seenTaskParam) {
+    setSeenTaskParam(taskParam);
+    if (taskParam) setOpenTaskId(taskParam);
+  }
   function closeTask() {
     setOpenTaskId(null);
     const url = new URL(window.location.href);

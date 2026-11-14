@@ -48,7 +48,7 @@ export async function getDashboardData() {
     prisma.activityLog.findMany({
       orderBy: { createdAt: "desc" },
       take: 10,
-      include: { actor: { select: { name: true } }, task: { select: { id: true, title: true } } },
+      include: { actor: { select: { name: true } }, task: { select: { id: true, title: true, projectId: true } } },
     }),
   ]);
 

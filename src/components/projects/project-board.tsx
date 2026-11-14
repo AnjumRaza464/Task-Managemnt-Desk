@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2,
   CalendarDays,
   Check,
@@ -80,8 +80,24 @@ export function ProjectBoard({
   const [editing, setEditing] = useState<TaskFormValues | null>(null);
   const [creatingIn, setCreatingIn] = useState<string | null | false>(false);
   const [deleting, setDeleting] = useState<ProjectTask | null>(null);
-  // Clicking a card opens the task in the same modal (details + chat) the workspace area uses.
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  // Clicking a card opens the task in the same modal (details + chat) the workspace area uses;
+  // ?task=<id> (from a notification) lands here with that task's modal already open.
+  const searchParams = useSearchParams();
+  const [openTaskId, setOpenTaskId] = useState<string | null>(searchParams.get("task"));
+  const taskParam = searchParams.get("task");
+  const [seenTaskParam, setSeenTaskParam] = useState(taskParam);
+  if (taskParam !== seenTaskParam) {
+    setSeenTaskParam(taskParam);
+    if (taskParam) setOpenTaskId(taskParam);
+  }
+  function closeTask() {
+    setOpenTaskId(null);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("task")) {
+      url.searchParams.delete("task");
+      window.history.replaceState(window.history.state, "", url.toString());
+    }
+  }
   const [deletingList, setDeletingList] = useState<ListRow | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [addingList, setAddingList] = useState(false);
@@ -326,7 +342,7 @@ export function ProjectBoard({
         )}
       </div>
 
-      <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && setOpenTaskId(null)} users={options.users} taskHref={taskHref} options={options} />
+      <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && closeTask()} users={options.users} taskHref={taskHref} options={options} />
       <TaskFormDialog
         open={Boolean(editing)}
         onOpenChange={(o) => !o && setEditing(null)}

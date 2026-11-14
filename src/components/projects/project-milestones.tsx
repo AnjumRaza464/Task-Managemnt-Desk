@@ -23,6 +23,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StatusBadge } from "@/components/shared/badges";
 import { cn, formatDate, toDateInputValue } from "@/lib/utils";
+import { taskOpenHref } from "@/lib/task-links";
 import type { ProjectDetail, ProjectTask } from "@/lib/queries/projects";
 
 type Milestone = ProjectDetail["project"]["milestones"][number];
@@ -167,7 +168,7 @@ export function ProjectMilestones({
                     <ul className="divide-y text-sm">
                       {mTasks.map((t) => (
                         <li key={t.id} className="flex items-center gap-2 py-1.5">
-                          <Link href={`${taskHref}/${t.id}`} className={cn("min-w-0 flex-1 truncate hover:underline", t.status === "COMPLETED" && "text-muted-foreground line-through")}>
+                          <Link href={taskOpenHref(t, taskHref)} className={cn("min-w-0 flex-1 truncate hover:underline", t.status === "COMPLETED" && "text-muted-foreground line-through")}>
                             {t.title}
                           </Link>
                           <span className="text-xs text-muted-foreground">{formatDate(t.dueDate, "MMM d")}</span>

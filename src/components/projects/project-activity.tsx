@@ -3,6 +3,7 @@ import { Activity } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { activityDetail, activityLabel } from "@/lib/activity-format";
 import { formatDateTime, timeAgo } from "@/lib/utils";
+import { taskOpenHref } from "@/lib/task-links";
 
 type Row = {
   id: string;
@@ -37,7 +38,7 @@ export function ProjectActivity({ activity, taskHref }: { activity: Row[]; taskH
                     {a.task && (
                       <>
                         {" on "}
-                        <Link href={`${taskHref}/${a.task.id}`} className="font-medium hover:underline">
+                        <Link href={taskOpenHref(a.task, taskHref)} className="font-medium hover:underline">
                           {a.task.title}
                         </Link>
                       </>

@@ -4,6 +4,7 @@ import { Flag } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { STATUS_COLORS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { taskOpenHref } from "@/lib/task-links";
 import type { ProjectDetail, ProjectTask } from "@/lib/queries/projects";
 
 const DAY_PX = 28;
@@ -165,7 +166,7 @@ export function ProjectTimeline({
                   <div key={t.id} className="flex border-b last:border-b-0">
                     <div className="flex shrink-0 items-center gap-2 border-r px-3 py-1.5" style={{ width: LABEL_PX }}>
                       <Link
-                        href={`${taskHref}/${t.id}`}
+                        href={taskOpenHref(t, taskHref)}
                         className={cn("min-w-0 flex-1 truncate text-xs hover:underline", t.status === "COMPLETED" && "text-muted-foreground line-through")}
                         title={t.title}
                       >
@@ -175,7 +176,7 @@ export function ProjectTimeline({
                     <div className="relative h-8" style={{ width }}>
                       <Grid days={days} />
                       <Link
-                        href={`${taskHref}/${t.id}`}
+                        href={taskOpenHref(t, taskHref)}
                         title={`${t.title} · ${format(start, "MMM d")} → ${format(t.dueDate, "MMM d")} · ${STATUS_LABELS[t.status]} · ${t.completion}%`}
                         className="absolute top-1/2 flex h-5 -translate-y-1/2 items-center overflow-hidden rounded-md text-[10px] text-white shadow-xs"
                         style={{ left: x(start) + 2, width: span * DAY_PX - 4, backgroundColor: STATUS_COLORS[t.status] }}

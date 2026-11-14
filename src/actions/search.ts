@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-guard";
 import { MONTH_NAMES, ROLE_LABELS, STATUS_LABELS, isGlobalRole } from "@/lib/constants";
+import { taskOpenHref } from "@/lib/task-links";
 import type { Prisma } from "@/generated/prisma/client";
 
 export type SearchHit = { id: string; label: string; detail?: string; href: string };
@@ -41,7 +42,7 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
     const [tasks, files, projects] = await Promise.all([
       prisma.task.findMany({
         where: { AND: [mine, { OR: [{ title: contains }, { description: contains }] }] },
-        select: { id: true, title: true, status: true, dueDate: true },
+        select: { id: true, title: true, status: true, dueDate: true, projectId: true },
         orderBy: { dueDate: "desc" },
         take: TAKE.tasks,
       }),
@@ -70,7 +71,7 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
         id: t.id,
         label: t.title,
         detail: `${STATUS_LABELS[t.status]} · due ${format(t.dueDate, "MMM d")}`,
-        href: `/my-tasks/${t.id}`,
+        href: taskOpenHref(t, "/my-tasks"),
       })),
       files: files.map((f) => ({ id: f.id, label: f.fileName, detail: `Shared by ${f.sharedBy.name}`, href: "/my-files" })),
     };
@@ -79,7 +80,7 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
   const [tasks, users, plans, files, projects] = await Promise.all([
     prisma.task.findMany({
       where: { OR: [{ title: contains }, { description: contains }, { assignees: { some: { user: { name: contains } } } }] },
-      select: { id: true, title: true, status: true, dueDate: true, assignees: { select: { user: { select: { name: true } } } } },
+      select: { id: true, title: true, status: true, dueDate: true, projectId: true, assignees: { select: { user: { select: { name: true } } } } },
       orderBy: { dueDate: "desc" },
       take: TAKE.tasks,
     }),
@@ -121,7 +122,7 @@ export async function globalSearch(raw: string): Promise<SearchResults> {
       id: t.id,
       label: t.title,
       detail: `${t.assignees.map((a) => a.user.name).join(", ") || "Unassigned"} · ${STATUS_LABELS[t.status]} · due ${format(t.dueDate, "MMM d")}`,
-      href: user.role === "ADMIN" ? `/tasks/${t.id}` : `/my-tasks/${t.id}`,
+      href: taskOpenHref(t, user.role === "ADMIN" ? "/tasks" : "/my-tasks"),
     })),
     users: users.map((u) => ({ id: u.id, label: u.name, detail: `${ROLE_LABELS[u.role]} · ${u.email}`, href: `/users/${u.id}` })),
     plans: plans.map((p) => ({

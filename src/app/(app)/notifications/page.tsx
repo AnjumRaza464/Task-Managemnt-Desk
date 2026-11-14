@@ -3,6 +3,8 @@ import { requireManagerPage } from "@/lib/auth-guard";
 import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { getNotifications, getUnreadNotificationCount } from "@/lib/queries/notifications";
+import { getTaskFormOptions } from "@/lib/queries/tasks";
+import { getAssignableUsers } from "@/lib/queries/users";
 import { PageHeader } from "@/components/shared/page-header";
 import { NotificationList } from "@/components/notifications/notification-list";
 
@@ -14,9 +16,12 @@ export default async function NotificationsPage({ searchParams }: PageProps<"/no
   after(() => syncOverdueTasks());
   const params = await searchParams;
   const filter = params.filter === "unread" ? "unread" : "all";
-  const [notifications, unreadCount] = await Promise.all([
+  // "Open task" lands on the project board with the task modal open, so the modal's users and form options come along.
+  const [notifications, unreadCount, users, options] = await Promise.all([
     getNotifications(manager.id, filter),
     getUnreadNotificationCount(manager.id),
+    getAssignableUsers(),
+    getTaskFormOptions(manager),
   ]);
 
   return (
@@ -25,7 +30,7 @@ export default async function NotificationsPage({ searchParams }: PageProps<"/no
         title="Notifications"
         description={unreadCount > 0 ? `${unreadCount} unread · assignments, completions, overdue alerts and comments` : "You're all caught up"}
       />
-      <NotificationList notifications={notifications} filter={filter} unreadCount={unreadCount} />
+      <NotificationList notifications={notifications} filter={filter} unreadCount={unreadCount} taskModal={{ users, options }} boardHref="/projects" />
     </>
   );
 }

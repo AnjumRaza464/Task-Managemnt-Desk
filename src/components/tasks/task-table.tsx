@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { CheckCircle2,
   ArrowDown,
   ArrowUp,
@@ -44,6 +44,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TaskFormDialog, taskToFormValues, type TaskFormValues } from "@/components/tasks/task-form-dialog";
 import { useQueryState } from "@/hooks/use-query-state";
+import { TaskModal } from "@/components/member/task-modal";
 import { RECURRENCE_LABELS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import type { TaskFormOptions, TaskListItem } from "@/lib/queries/tasks";
@@ -97,6 +98,7 @@ export function TaskTable({
   taskHref = "/tasks",
   canManage = true,
   showProject = true,
+  boardHref = "/projects",
 }: {
   tasks: TaskListItem[];
   options: TaskFormOptions;
@@ -109,8 +111,19 @@ export function TaskTable({
   /** Hide edit / assign / delete when the viewer cannot manage these tasks. */
   canManage?: boolean;
   showProject?: boolean;
+  /** Base path of the project board a task opens on (clicking a title goes there with the task modal open). */
+  boardHref?: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  // Clicking a title opens the task like on the Kanban: on its project board with the modal open.
+  // Already on that project's page (its Tasks tab), or no project at all: the modal opens right here.
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  function openTask(task: TaskListItem) {
+    const onProjectPage = task.projectId ? pathname === `${boardHref}/${task.projectId}` : false;
+    if (task.projectId && !onProjectPage) router.push(`${boardHref}/${task.projectId}?task=${task.id}`);
+    else setOpenTaskId(task.id);
+  }
   const [editing, setEditing] = useState<TaskFormValues | null>(null);
   const [deleting, setDeleting] = useState<TaskListItem | null>(null);
   const [, startTransition] = useTransition();
@@ -178,13 +191,14 @@ export function TaskTable({
               return (
                 <TableRow key={task.id}>
                   <TableCell className="max-w-[18rem]">
-                    <Link
-                      href={`${taskHref}/${task.id}`}
-                      className={cn("flex items-center gap-1.5 font-medium hover:underline", task.status === "COMPLETED" && "text-muted-foreground")}
+                    <button
+                      type="button"
+                      onClick={() => openTask(task)}
+                      className={cn("flex max-w-full cursor-pointer items-center gap-1.5 text-left font-medium hover:underline", task.status === "COMPLETED" && "text-muted-foreground")}
                     >
                       {task.status === "COMPLETED" && <CheckCircle2 className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Completed" />}
                       <span className={cn("truncate", task.status === "COMPLETED" && "line-through")}>{task.title}</span>
-                    </Link>
+                    </button>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {showProject && task.project && (
                         <span className="inline-flex max-w-40 items-center gap-1 truncate" title={`${task.project.name}${task.list ? ` · ${task.list.name}` : ""}`}>
@@ -341,6 +355,7 @@ export function TaskTable({
         task={editing}
         options={options}
       />
+      <TaskModal taskId={openTaskId} onOpenChange={(o) => !o && setOpenTaskId(null)} users={options.users} taskHref={taskHref} options={options} />
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(o) => !o && setDeleting(null)}

@@ -12,6 +12,7 @@ import {
 import { STATUS_COLORS, STATUS_LABELS, TASK_STATUSES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { TaskListItem } from "@/lib/queries/tasks";
+import { taskOpenHref } from "@/lib/task-links";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_VISIBLE = 3;
@@ -71,7 +72,7 @@ export function MonthGrid({ year, month, tasks }: { year: number; month: number;
                   {items.slice(0, MAX_VISIBLE).map((task) => (
                     <Link
                       key={task.id}
-                      href={`/tasks/${task.id}`}
+                      href={taskOpenHref(task)}
                       title={`${task.title} · ${task.assignees.map((a) => a.user.name).join(", ")} · ${STATUS_LABELS[task.status]}`}
                       className={cn(
                         "block truncate rounded-sm border-l-2 bg-muted/60 px-1.5 py-0.5 text-[11px] leading-tight transition-colors hover:bg-accent",

@@ -25,8 +25,8 @@ export async function getTaskPanel(taskId: string) {
           orderBy: { createdAt: "desc" },
           select: { id: true, fileName: true, mimeType: true, size: true, createdAt: true, uploadedBy: { select: { name: true } } },
         },
-        blockedBy: { select: { blocker: { select: { id: true, title: true, status: true, dueDate: true } } } },
-        blocks: { select: { blocked: { select: { id: true, title: true, status: true, dueDate: true } } } },
+        blockedBy: { select: { blocker: { select: { id: true, title: true, status: true, dueDate: true, projectId: true } } } },
+        blocks: { select: { blocked: { select: { id: true, title: true, status: true, dueDate: true, projectId: true } } } },
         _count: { select: { comments: true } },
       },
     });

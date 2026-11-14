@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckSquare, ListTodo, MessageSquare, Paperclip, Users } from "lucide-react";
+import { ListTodo } from "lucide-react";
 import { requireMemberPage } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { after } from "next/server";
 import { syncOverdueTasks } from "@/lib/overdue";
 import { monthRange } from "@/lib/dates";
-import { taskListInclude } from "@/lib/queries/tasks";
-import { Card, CardContent } from "@/components/ui/card";
-import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
+import { getTaskFormOptions, taskListInclude } from "@/lib/queries/tasks";
+import { getAssignableUsers } from "@/lib/queries/users";
+import { MyTaskList } from "@/components/member/my-task-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { MONTH_NAMES } from "@/lib/constants";
-import { cn, formatDate, monthKey, parseMonthKey } from "@/lib/utils";
+import { cn, monthKey, parseMonthKey } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "My tasks" };
 
@@ -41,11 +41,16 @@ export default async function MyTasksPage({ searchParams }: PageProps<"/my-tasks
   const current = selected ? parseMonthKey(selected) : monthCounts.has(thisKey) || months.length === 0 ? thisMonth : months[0];
   const currentKey = monthKey(current.year, current.month);
 
-  const tasks = await prisma.task.findMany({
-    where: { ...mine, dueDate: monthRange(current.year, current.month) },
-    include: taskListInclude,
-    orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
-  });
+  // The task modal needs the people to @mention and, for managers, the form options for Edit.
+  const [tasks, users, options] = await Promise.all([
+    prisma.task.findMany({
+      where: { ...mine, dueDate: monthRange(current.year, current.month) },
+      include: taskListInclude,
+      orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
+    }),
+    getAssignableUsers(),
+    user.role === "MEMBER" ? Promise.resolve(null) : getTaskFormOptions(user),
+  ]);
 
   const count = (s: string) => tasks.filter((t) => t.status === s).length;
   const progress = tasks.length ? Math.round(tasks.reduce((sum, t) => sum + t.completion, 0) / tasks.length) : 0;
@@ -99,52 +104,7 @@ export default async function MyTasksPage({ searchParams }: PageProps<"/my-tasks
             {tasks.length === 0 ? (
               <EmptyState icon={ListTodo} title="No tasks this month" />
             ) : (
-              <div className="grid gap-3">
-                {tasks.map((task) => {
-                  const done = task.subtasks.filter((s) => s.isCompleted).length;
-                  const others = task.assignees.filter((a) => a.userId !== user.id);
-                  return (
-                    <Link key={task.id} href={`/my-tasks/${task.id}`}>
-                      <Card className="transition-colors hover:bg-accent/40">
-                        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="min-w-0 space-y-1">
-                            <p className="truncate font-medium">{task.title}</p>
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                              <span>Due {formatDate(task.dueDate)}</span>
-                              <CategoryBadge category={task.category} />
-                              {others.length > 0 && (
-                                <span className="inline-flex items-center gap-1" title={others.map((a) => a.user.name).join(", ")}>
-                                  <Users className="size-3" /> with {others.length === 1 ? others[0].user.name : `${others.length} others`}
-                                </span>
-                              )}
-                              {task._count.subtasks > 0 && (
-                                <span className="inline-flex items-center gap-1">
-                                  <CheckSquare className="size-3" /> {done}/{task._count.subtasks}
-                                </span>
-                              )}
-                              {task._count.comments > 0 && (
-                                <span className="inline-flex items-center gap-1">
-                                  <MessageSquare className="size-3" /> {task._count.comments}
-                                </span>
-                              )}
-                              {task._count.attachments > 0 && (
-                                <span className="inline-flex items-center gap-1">
-                                  <Paperclip className="size-3" /> {task._count.attachments}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <PriorityBadge priority={task.priority} />
-                            <StatusBadge status={task.status} />
-                            <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">{task.completion}%</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  );
-                })}
-              </div>
+              <MyTaskList tasks={tasks} currentUserId={user.id} users={users} options={options} />
             )}
           </div>
         </div>

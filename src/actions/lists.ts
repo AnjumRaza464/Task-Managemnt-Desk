@@ -2,8 +2,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { ActionError, runAction } from "@/lib/action-result";
-import { logActivity } from "@/lib/activity";
+import { logActivity, notifyManagers } from "@/lib/activity";
 import { requireProjectAccess, requireTaskAccess } from "@/lib/permissions";
+import { assertNotBlocked, onTaskCompleted } from "@/lib/task-events";
+import { isDoneListName, progressForStatusChange } from "@/lib/task-progress";
 import { listSchema, listUpdateSchema, moveTaskSchema, reorderListsSchema } from "@/lib/validations/project";
 import { revalidateProjectViews as revalidateProject } from "@/lib/project-members";
 import { revalidateTaskViews } from "@/lib/task-views";
@@ -81,7 +83,11 @@ export async function reorderLists(input: unknown) {
   });
 }
 
-/** Moves a task to another list (or out of every list) inside its project, at an optional position. */
+/**
+ * Moves a task to another list (or out of every list) inside its project, at
+ * an optional position. Landing in a "Done" column marks the task completed
+ * (same as setting its status); leaving "Done" reopens it.
+ */
 export async function moveTaskToList(input: unknown) {
   return runAction(async () => {
     const values = moveTaskSchema.parse(input);
@@ -96,7 +102,11 @@ export async function moveTaskToList(input: unknown) {
         if (!list || list.projectId !== projectId) throw new ActionError("That list belongs to another project.");
         listName = list.name;
       }
-      const before = await tx.task.findUnique({ where: { id: values.id }, select: { listId: true, list: { select: { name: true } }, title: true } });
+      const before = await tx.task.findUnique({
+        where: { id: values.id },
+        select: { listId: true, list: { select: { name: true } }, title: true, status: true, completion: true, dueDate: true },
+      });
+      if (!before) throw new ActionError("Task not found.");
 
       // Re-number the target list so the moved task lands at `index` (append by default).
       const siblings = await tx.task.findMany({
@@ -113,7 +123,9 @@ export async function moveTaskToList(input: unknown) {
         });
       }
 
-      if (before && before.listId !== values.listId) {
+      let status = before.status;
+      let completion = before.completion;
+      if (before.listId !== values.listId) {
         await logActivity(
           {
             actorId: user.id,
@@ -126,8 +138,54 @@ export async function moveTaskToList(input: unknown) {
           },
           tx,
         );
+
+        // The column decides the status: into "Done" = completed, out of "Done" = back in progress.
+        const toDone = isDoneListName(listName);
+        const fromDone = isDoneListName(before.list?.name);
+        const nextStatus = toDone && before.status !== "COMPLETED" ? "COMPLETED" : !toDone && fromDone && before.status === "COMPLETED" ? "IN_PROGRESS" : null;
+        if (nextStatus) {
+          const progress = progressForStatusChange(before, nextStatus);
+          if (progress.status === "COMPLETED") await assertNotBlocked(tx, values.id);
+          const updated = await tx.task.update({
+            where: { id: values.id },
+            data: {
+              status: progress.status,
+              completion: progress.completion,
+              ...(progress.completedAt !== undefined ? { completedAt: progress.completedAt } : {}),
+            },
+          });
+          status = updated.status;
+          completion = updated.completion;
+          if (updated.status !== before.status) {
+            await logActivity(
+              {
+                actorId: user.id,
+                action: "STATUS_CHANGED",
+                entity: "Task",
+                entityId: values.id,
+                taskId: values.id,
+                projectId,
+                details: { title: updated.title, from: before.status, to: updated.status, by: "board" },
+              },
+              tx,
+            );
+            if (updated.status === "COMPLETED") {
+              await notifyManagers(
+                {
+                  type: "TASK_COMPLETED",
+                  title: "Task completed",
+                  message: `${user.name} moved "${updated.title}" to ${listName ?? "Done"}.`,
+                  taskId: values.id,
+                  excludeUserId: user.id,
+                },
+                tx,
+              );
+              await onTaskCompleted(tx, updated, user.id);
+            }
+          }
+        }
       }
-      return { listId: values.listId };
+      return { listId: values.listId, status, completion };
     });
 
     await revalidateProject(projectId);

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
+import { CheckCircle2,
   CalendarDays,
   Check,
   CheckSquare,
@@ -423,7 +423,12 @@ function BoardCard({
       )}
     >
       <div className="flex items-start gap-1">
-        <button type="button" onClick={onOpen} className="line-clamp-2 min-w-0 flex-1 cursor-pointer text-left text-sm font-medium leading-snug hover:underline">
+        {task.status === "COMPLETED" && <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Completed" />}
+        <button
+          type="button"
+          onClick={onOpen}
+          className={cn("line-clamp-2 min-w-0 flex-1 cursor-pointer text-left text-sm font-medium leading-snug hover:underline", task.status === "COMPLETED" && "text-muted-foreground line-through")}
+        >
           {task.title}
         </button>
         <DropdownMenu>

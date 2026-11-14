@@ -35,6 +35,11 @@ export function normalizeProgress(
   return { status: nextStatus, completion: nextCompletion, completedAt };
 }
 
+/** A Kanban column that means the work is finished: landing a task there completes it. */
+export function isDoneListName(name: string | null | undefined): boolean {
+  return /^(done|complete|completed|finished|closed)$/i.test((name ?? "").trim());
+}
+
 type Existing = { status: TaskStatus; completion: number; dueDate: Date };
 
 /** Progress after an explicit status change (e.g. from a select or a kanban drop). */

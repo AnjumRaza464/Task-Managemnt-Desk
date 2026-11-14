@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { moveTaskToList } from "@/actions/lists";
+import { isDoneListName } from "@/lib/task-progress";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarDays, FolderInput, GanttChart, GripVertical, KanbanSquare, LayoutList, Lock, MessagesSquare, MoreHorizontal, PieChart, Plus, Search } from "lucide-react";
+import { CheckCircle2, CalendarDays, FolderInput, GanttChart, GripVertical, KanbanSquare, LayoutList, Lock, MessagesSquare, MoreHorizontal, PieChart, Plus, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -111,7 +112,15 @@ export function MemberProjectView({
     if (!task || (task.listId ?? null) === listId) return;
     const snapshot = allTasks;
     const target = project.lists.find((l) => l.id === listId);
-    setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, listId, list: target ? { id: target.id, name: target.name } : null } : t)));
+    // Landing in "Done" shows the task as completed right away; the server confirms it.
+    const done = isDoneListName(target?.name);
+    setAllTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, listId, list: target ? { id: target.id, name: target.name } : null, ...(done ? { status: "COMPLETED" as const, completion: 100 } : {}) }
+          : t,
+      ),
+    );
     startTransition(async () => {
       const result = await moveTaskToList({ id, listId });
       if (!result.ok) {
@@ -119,7 +128,9 @@ export function MemberProjectView({
         toast.error(result.error);
         return;
       }
-      toast.success(`Moved to ${target?.name ?? "Unsorted"}`);
+      const { status, completion } = result.data;
+      setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status, completion } : t)));
+      toast.success(status === "COMPLETED" && task.status !== "COMPLETED" ? `Moved to ${target?.name ?? "Done"} and marked completed` : `Moved to ${target?.name ?? "Unsorted"}`);
       router.refresh();
     });
   }
@@ -313,7 +324,10 @@ export function MemberProjectView({
                 {tasks.map((t) => (
                   <TableRow key={t.id} className="cursor-pointer" onClick={() => setOpenTaskId(t.id)}>
                     <TableCell className="max-w-[20rem]">
-                      <span className="block truncate font-medium">{t.title}</span>
+                      <span className={cn("flex items-center gap-1.5 font-medium", t.status === "COMPLETED" && "text-muted-foreground")}>
+                        {t.status === "COMPLETED" && <CheckCircle2 className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Completed" />}
+                        <span className={cn("truncate", t.status === "COMPLETED" && "line-through")}>{t.title}</span>
+                      </span>
                       {t._count.blockedBy > 0 && (
                         <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-300">
                           <Lock className="size-3" /> waits on {t._count.blockedBy}
@@ -421,7 +435,13 @@ function BoardCard({
     >
       <div className="flex items-start gap-1">
         {draggable && <GripVertical className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/50" aria-hidden />}
-        <button type="button" onClick={onOpen} draggable={false} className="line-clamp-2 min-w-0 flex-1 text-left text-sm font-medium leading-snug hover:underline">
+        {task.status === "COMPLETED" && <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Completed" />}
+        <button
+          type="button"
+          onClick={onOpen}
+          draggable={false}
+          className={cn("line-clamp-2 min-w-0 flex-1 text-left text-sm font-medium leading-snug hover:underline", task.status === "COMPLETED" && "text-muted-foreground line-through")}
+        >
           {task.title}
         </button>
         {draggable && (

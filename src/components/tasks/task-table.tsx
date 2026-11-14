@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
+import { CheckCircle2,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -178,8 +178,12 @@ export function TaskTable({
               return (
                 <TableRow key={task.id}>
                   <TableCell className="max-w-[18rem]">
-                    <Link href={`${taskHref}/${task.id}`} className="block truncate font-medium hover:underline">
-                      {task.title}
+                    <Link
+                      href={`${taskHref}/${task.id}`}
+                      className={cn("flex items-center gap-1.5 font-medium hover:underline", task.status === "COMPLETED" && "text-muted-foreground")}
+                    >
+                      {task.status === "COMPLETED" && <CheckCircle2 className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Completed" />}
+                      <span className={cn("truncate", task.status === "COMPLETED" && "line-through")}>{task.title}</span>
                     </Link>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {showProject && task.project && (

@@ -3,10 +3,10 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarDays, CheckCircle2, Circle, ExternalLink, FileText, Flag, Loader2, Lock, MessageSquare, Paperclip, Pencil, Trash2, Upload, X } from "lucide-react";
+import { Plus, CalendarDays, CheckCircle2, Circle, ExternalLink, FileText, Flag, Loader2, Lock, MessageSquare, Paperclip, Pencil, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { moveTaskToList } from "@/actions/lists";
-import { updateSubtask } from "@/actions/subtasks";
+import { createSubtask, deleteSubtask, updateSubtask } from "@/actions/subtasks";
 import { uploadAttachment } from "@/actions/attachments";
 import { deleteTask } from "@/actions/tasks";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -15,11 +15,11 @@ import type { TaskFormOptions } from "@/lib/queries/tasks";
 import { getTaskPanel, type TaskPanel } from "@/actions/task-view";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { AssigneeAvatars } from "@/components/shared/assignee-avatars";
 import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/shared/badges";
 import { SelectField } from "@/components/shared/select-field";
-import { MyTaskControls } from "@/components/member/my-task-controls";
 import { TaskConversation } from "@/components/member/task-conversation";
 import type { MentionUser } from "@/components/tasks/mention-composer";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
@@ -52,6 +52,8 @@ export function TaskModal({
   const [pane, setPane] = useState<"details" | "chat">("details");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [moving, startMove] = useTransition();
+  const [newSubtask, setNewSubtask] = useState("");
+  const [addingSubtask, startAddSubtask] = useTransition();
   const [uploading, startUpload] = useTransition();
   const [, startTransition] = useTransition();
 
@@ -99,6 +101,33 @@ export function TaskModal({
         return;
       }
       toast.success(`Moved to ${target?.name ?? "Unsorted"}`);
+      reload();
+    });
+  }
+
+  function addSubtask() {
+    const title = newSubtask.trim();
+    if (!title || !taskId) return;
+    startAddSubtask(async () => {
+      const result = await createSubtask({ taskId, title });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setNewSubtask("");
+      reload();
+    });
+  }
+
+  function removeSubtask(id: string) {
+    setBusyId(id);
+    startTransition(async () => {
+      const result = await deleteSubtask(id);
+      setBusyId(null);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       reload();
     });
   }
@@ -190,7 +219,10 @@ export function TaskModal({
                         </span>
                       )}
                     </div>
-                    <h2 className="text-xl font-semibold leading-tight">{task.title}</h2>
+                    <h2 className={cn("flex items-start gap-2 text-xl font-semibold leading-tight", task.status === "COMPLETED" && "text-muted-foreground")}>
+                      {task.status === "COMPLETED" && <CheckCircle2 className="mt-1 size-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Completed" />}
+                      <span className={cn(task.status === "COMPLETED" && "line-through")}>{task.title}</span>
+                    </h2>
                   </div>
                   {options && task.access.canManage && (
                     <>
@@ -267,7 +299,7 @@ export function TaskModal({
                       placeholder="Unsorted"
                       options={[{ value: "", label: "Unsorted" }, ...task.project.lists.map((l) => ({ value: l.id, label: l.name }))].filter((o) => o.value || task.listId)}
                     />
-                    <p className="mt-1.5 text-xs text-muted-foreground">Same as dragging the card on the board: pick the column this task should sit in.</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">Same as dragging the card on the board. Moving it to Done marks the task completed.</p>
                   </section>
                 )}
 
@@ -285,23 +317,16 @@ export function TaskModal({
                   <p className="whitespace-pre-wrap text-sm text-muted-foreground">{task.description || "No description provided."}</p>
                 </section>
 
-                {task.access.canUpdateProgress && task.access.isAssignee && (
-                  <section className="rounded-xl border p-4">
-                    <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">Update your progress</p>
-                    <MyTaskControls task={{ id: task.id, status: task.status, completion: task.completion }} />
-                  </section>
-                )}
-
                 <section className="space-y-2">
                   <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                     Subtasks <span className="font-normal normal-case">{doneSubtasks}/{task.subtasks.length}</span>
                   </p>
                   {task.subtasks.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No subtasks.</p>
+                    <p className="text-sm text-muted-foreground">{task.access.canEdit ? "No subtasks yet. Add one below." : "No subtasks."}</p>
                   ) : (
                     <ul className="space-y-1.5">
                       {task.subtasks.map((s) => (
-                        <li key={s.id} className="flex items-center gap-2 text-sm">
+                        <li key={s.id} className="group flex items-center gap-2 text-sm">
                           {task.access.canEdit ? (
                             busyId === s.id ? (
                               <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -313,10 +338,44 @@ export function TaskModal({
                           ) : (
                             <Circle className="size-4 text-muted-foreground" />
                           )}
-                          <span className={cn(s.isCompleted && "text-muted-foreground line-through")}>{s.title}</span>
+                          <span className={cn("min-w-0 flex-1 truncate", s.isCompleted && "text-muted-foreground line-through")}>{s.title}</span>
+                          {task.access.canEdit && (
+                            <Button
+                              size="icon-xs"
+                              variant="ghost"
+                              aria-label={`Delete subtask ${s.title}`}
+                              className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
+                              disabled={busyId === s.id}
+                              onClick={() => removeSubtask(s.id)}
+                            >
+                              <Trash2 />
+                            </Button>
+                          )}
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {task.access.canEdit && (
+                    <form
+                      className="flex items-center gap-2 pt-1"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        addSubtask();
+                      }}
+                    >
+                      <Input
+                        value={newSubtask}
+                        onChange={(e) => setNewSubtask(e.target.value)}
+                        placeholder="Add a subtask… press Enter"
+                        maxLength={160}
+                        aria-label="New subtask"
+                        disabled={addingSubtask}
+                        className="h-8"
+                      />
+                      <Button type="submit" size="sm" variant="outline" disabled={addingSubtask || !newSubtask.trim()}>
+                        {addingSubtask ? <Loader2 className="animate-spin" /> : <Plus />} Add
+                      </Button>
+                    </form>
                   )}
                 </section>
 
